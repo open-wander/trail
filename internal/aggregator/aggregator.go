@@ -7,12 +7,14 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"log"
+	"net/netip"
 	"net/url"
 	"sync"
 	"time"
 
 	"github.com/open-wander/trail/internal/bot"
 	"github.com/open-wander/trail/internal/parser"
+	"github.com/oschwald/geoip2-golang/v2"
 )
 
 const (
@@ -26,12 +28,17 @@ type Aggregator struct {
 	parser        *parser.Parser
 	flushInterval time.Duration
 	ipSalt        string
+	geoReader     *geoip2.Reader
 
 	mu            sync.Mutex
 	requests      map[requestKey]*requestVal
 	visitors      map[visitorKey]struct{}
 	referrers     map[referrerKey]int
 	userAgents    map[userAgentKey]int
+	countries     map[countryKey]int
+	browsers      map[browserKey]int
+	osStats       map[osKey]int
+	durationHist  map[durationHistKey]int
 	bufferSize    int
 }
 
@@ -67,9 +74,34 @@ type userAgentKey struct {
 	Category string
 }
 
+type countryKey struct {
+	Hour    string
+	Router  string
+	Country string
+}
+
+type browserKey struct {
+	Hour    string
+	Router  string
+	Browser string
+}
+
+type osKey struct {
+	Hour   string
+	Router string
+	OS     string
+}
+
+type durationHistKey struct {
+	Hour   string
+	Router string
+	Bucket string
+}
+
 // New creates a new Aggregator with a 10-second flush interval.
 // If p is nil, defaults to a Traefik parser.
-func New(db *sql.DB, p *parser.Parser) *Aggregator {
+// geoDBPath is optional; if empty or the file can't be opened, GeoIP lookup is disabled.
+func New(db *sql.DB, p *parser.Parser, geoDBPath string) *Aggregator {
 	if p == nil {
 		p = parser.NewParser("traefik")
 	}
@@ -81,15 +113,31 @@ func New(db *sql.DB, p *parser.Parser) *Aggregator {
 	}
 	salt := hex.EncodeToString(saltBytes)
 
+	var geoReader *geoip2.Reader
+	if geoDBPath != "" {
+		var err error
+		geoReader, err = geoip2.Open(geoDBPath)
+		if err != nil {
+			log.Printf("warning: failed to open GeoIP database at %s: %v (country lookup disabled)", geoDBPath, err)
+		} else {
+			log.Printf("GeoIP database loaded: %s", geoDBPath)
+		}
+	}
+
 	return &Aggregator{
 		db:            db,
 		parser:        p,
 		flushInterval: defaultFlushInterval,
 		ipSalt:        salt,
+		geoReader:     geoReader,
 		requests:      make(map[requestKey]*requestVal),
 		visitors:      make(map[visitorKey]struct{}),
 		referrers:     make(map[referrerKey]int),
 		userAgents:    make(map[userAgentKey]int),
+		countries:     make(map[countryKey]int),
+		browsers:      make(map[browserKey]int),
+		osStats:       make(map[osKey]int),
+		durationHist:  make(map[durationHistKey]int),
 	}
 }
 
@@ -217,6 +265,45 @@ func (a *Aggregator) accumulate(entry *parser.LogEntry) {
 	}
 	a.userAgents[uaKey]++
 
+	// Accumulate browser breakdown
+	browser := bot.ClassifyBrowser(entry.UserAgent)
+	bKey := browserKey{
+		Hour:    hour,
+		Router:  router,
+		Browser: browser,
+	}
+	a.browsers[bKey]++
+
+	// Accumulate OS breakdown
+	osName := bot.ClassifyOS(entry.UserAgent)
+	oKey := osKey{
+		Hour:   hour,
+		Router: router,
+		OS:     osName,
+	}
+	a.osStats[oKey]++
+
+	// Accumulate duration histogram
+	bucket := durationBucket(entry.DurationMs)
+	dhKey := durationHistKey{
+		Hour:   hour,
+		Router: router,
+		Bucket: bucket,
+	}
+	a.durationHist[dhKey]++
+
+	// Accumulate country (GeoIP lookup)
+	if a.geoReader != nil {
+		if country := lookupCountry(a.geoReader, entry.IP); country != "" {
+			cKey := countryKey{
+				Hour:    hour,
+				Router:  router,
+				Country: country,
+			}
+			a.countries[cKey]++
+		}
+	}
+
 	a.bufferSize++
 }
 
@@ -228,6 +315,10 @@ func (a *Aggregator) flush(ctx context.Context) error {
 	visitors := a.visitors
 	referrers := a.referrers
 	userAgents := a.userAgents
+	countries := a.countries
+	browsers := a.browsers
+	osStats := a.osStats
+	durationHist := a.durationHist
 	bufSize := a.bufferSize
 
 	// Reset buffers
@@ -235,6 +326,10 @@ func (a *Aggregator) flush(ctx context.Context) error {
 	a.visitors = make(map[visitorKey]struct{})
 	a.referrers = make(map[referrerKey]int)
 	a.userAgents = make(map[userAgentKey]int)
+	a.countries = make(map[countryKey]int)
+	a.browsers = make(map[browserKey]int)
+	a.osStats = make(map[osKey]int)
+	a.durationHist = make(map[durationHistKey]int)
 	a.bufferSize = 0
 	a.mu.Unlock()
 
@@ -323,6 +418,86 @@ func (a *Aggregator) flush(ctx context.Context) error {
 		}
 	}
 
+	// Flush countries
+	if len(countries) > 0 {
+		countryStmt, err := tx.PrepareContext(ctx, `
+			INSERT INTO countries (hour, router, country, count)
+			VALUES (?, ?, ?, ?)
+			ON CONFLICT(hour, router, country) DO UPDATE SET
+				count = count + excluded.count
+		`)
+		if err != nil {
+			return err
+		}
+		defer countryStmt.Close()
+
+		for key, count := range countries {
+			if _, err := countryStmt.ExecContext(ctx, key.Hour, key.Router, key.Country, count); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Flush browsers
+	if len(browsers) > 0 {
+		browserStmt, err := tx.PrepareContext(ctx, `
+			INSERT INTO browsers (hour, router, browser, count)
+			VALUES (?, ?, ?, ?)
+			ON CONFLICT(hour, router, browser) DO UPDATE SET
+				count = count + excluded.count
+		`)
+		if err != nil {
+			return err
+		}
+		defer browserStmt.Close()
+
+		for key, count := range browsers {
+			if _, err := browserStmt.ExecContext(ctx, key.Hour, key.Router, key.Browser, count); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Flush OS stats
+	if len(osStats) > 0 {
+		osStmt, err := tx.PrepareContext(ctx, `
+			INSERT INTO os_stats (hour, router, os, count)
+			VALUES (?, ?, ?, ?)
+			ON CONFLICT(hour, router, os) DO UPDATE SET
+				count = count + excluded.count
+		`)
+		if err != nil {
+			return err
+		}
+		defer osStmt.Close()
+
+		for key, count := range osStats {
+			if _, err := osStmt.ExecContext(ctx, key.Hour, key.Router, key.OS, count); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Flush duration histogram
+	if len(durationHist) > 0 {
+		dhStmt, err := tx.PrepareContext(ctx, `
+			INSERT INTO duration_hist (hour, router, bucket, count)
+			VALUES (?, ?, ?, ?)
+			ON CONFLICT(hour, router, bucket) DO UPDATE SET
+				count = count + excluded.count
+		`)
+		if err != nil {
+			return err
+		}
+		defer dhStmt.Close()
+
+		for key, count := range durationHist {
+			if _, err := dhStmt.ExecContext(ctx, key.Hour, key.Router, key.Bucket, count); err != nil {
+				return err
+			}
+		}
+	}
+
 	// Commit transaction
 	if err := tx.Commit(); err != nil {
 		return err
@@ -345,4 +520,40 @@ func extractDomain(referer string) string {
 		return ""
 	}
 	return u.Host
+}
+
+// durationBucket returns the histogram bucket label for a given duration in ms.
+func durationBucket(ms int) string {
+	switch {
+	case ms <= 10:
+		return "0-10ms"
+	case ms <= 50:
+		return "10-50ms"
+	case ms <= 100:
+		return "50-100ms"
+	case ms <= 500:
+		return "100-500ms"
+	case ms <= 1000:
+		return "500-1000ms"
+	default:
+		return "1000+ms"
+	}
+}
+
+// lookupCountry returns the ISO country code for an IP address.
+// Returns empty string on lookup failure.
+func lookupCountry(reader *geoip2.Reader, ipStr string) string {
+	addr, err := netip.ParseAddr(ipStr)
+	if err != nil {
+		return ""
+	}
+	record, err := reader.Country(addr)
+	if err != nil {
+		return ""
+	}
+	code := record.Country.ISOCode
+	if code == "" {
+		return ""
+	}
+	return code
 }

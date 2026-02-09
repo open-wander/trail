@@ -23,6 +23,7 @@ func TestLoad(t *testing.T) {
 				HtpasswdFile:  "",
 				AuthUser:      "",
 				AuthPass:      "",
+				GeoIPPath:     "",
 			},
 			wantErr: false,
 		},
@@ -36,6 +37,7 @@ func TestLoad(t *testing.T) {
 				"TRAIL_HTPASSWD_FILE":  "/etc/htpasswd",
 				"TRAIL_AUTH_USER":      "admin",
 				"TRAIL_AUTH_PASS":      "secret",
+				"TRAIL_GEOIP_PATH":     "/geoip/dbip-country-lite.mmdb",
 			},
 			want: &Config{
 				LogFile:       "/custom/access.log",
@@ -45,6 +47,7 @@ func TestLoad(t *testing.T) {
 				HtpasswdFile:  "/etc/htpasswd",
 				AuthUser:      "admin",
 				AuthPass:      "secret",
+				GeoIPPath:     "/geoip/dbip-country-lite.mmdb",
 			},
 			wantErr: false,
 		},
@@ -85,6 +88,7 @@ func TestLoad(t *testing.T) {
 				HtpasswdFile:  "/etc/htpasswd",
 				AuthUser:      "",
 				AuthPass:      "",
+				GeoIPPath:     "",
 			},
 			wantErr: false,
 		},
@@ -102,6 +106,7 @@ func TestLoad(t *testing.T) {
 				HtpasswdFile:  "",
 				AuthUser:      "admin",
 				AuthPass:      "secret",
+				GeoIPPath:     "",
 			},
 			wantErr: false,
 		},
@@ -118,6 +123,7 @@ func TestLoad(t *testing.T) {
 				"TRAIL_HTPASSWD_FILE",
 				"TRAIL_AUTH_USER",
 				"TRAIL_AUTH_PASS",
+				"TRAIL_GEOIP_PATH",
 			}
 			for _, key := range clearEnv {
 				os.Unsetenv(key)
@@ -165,6 +171,9 @@ func TestLoad(t *testing.T) {
 			}
 			if got.AuthPass != tt.want.AuthPass {
 				t.Errorf("AuthPass = %v, want %v", got.AuthPass, tt.want.AuthPass)
+			}
+			if got.GeoIPPath != tt.want.GeoIPPath {
+				t.Errorf("GeoIPPath = %v, want %v", got.GeoIPPath, tt.want.GeoIPPath)
 			}
 		})
 	}

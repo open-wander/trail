@@ -76,6 +76,25 @@ type OverviewData struct {
 	// Hour of day visitors overlay
 	HourVisitors    []HourOfDayStat
 	MaxHourVisitors int64
+	// New analytics panels
+	Countries         []CountryStat
+	Browsers          []BrowserStat
+	OSStats           []OSStat
+	BrowserDonut      []DonutSegment
+	OSDonut           []DonutSegment
+	DurationHist      []DurationBucketStat
+	Percentiles       *PercentileResult
+	BandwidthChart    []TimeSeriesPoint
+	ResponseTimeChart []TimeSeriesPoint
+	MobilePct         float64
+	DesktopPct        float64
+	GeoIPEnabled      bool
+	MaxCountry        int64
+	MaxBrowser        int64
+	MaxOS             int64
+	MaxDurationHist   int64
+	MaxBandwidth      int64
+	MaxResponseTime   int64
 }
 
 // SecurityData represents the data for the security template
@@ -413,6 +432,132 @@ func (s *Server) getOverviewData(c *fiber.Ctx) (*OverviewData, error) {
 		}
 	}
 
+	// Fetch new analytics data
+	browsers, err := s.queries.BrowserBreakdown(filter)
+	if err != nil {
+		log.Printf("Warning: failed to fetch browser breakdown: %v", err)
+	}
+
+	osStats, err := s.queries.OSBreakdown(filter)
+	if err != nil {
+		log.Printf("Warning: failed to fetch OS breakdown: %v", err)
+	}
+
+	durationHist, err := s.queries.DurationHistogram(filter)
+	if err != nil {
+		log.Printf("Warning: failed to fetch duration histogram: %v", err)
+	}
+
+	percentiles, err := s.queries.DurationPercentiles(filter)
+	if err != nil {
+		log.Printf("Warning: failed to fetch duration percentiles: %v", err)
+	}
+
+	bandwidthChart, err := s.queries.BandwidthTimeSeries(filter, useDaily)
+	if err != nil {
+		log.Printf("Warning: failed to fetch bandwidth time series: %v", err)
+	}
+
+	responseTimeChart, err := s.queries.ResponseTimeTimeSeries(filter, useDaily)
+	if err != nil {
+		log.Printf("Warning: failed to fetch response time series: %v", err)
+	}
+
+	// Country breakdown (only if GeoIP is configured)
+	geoIPEnabled := s.config.GeoIPPath != ""
+	var countries []CountryStat
+	if geoIPEnabled {
+		countries, err = s.queries.CountryBreakdown(filter, 20)
+		if err != nil {
+			log.Printf("Warning: failed to fetch country breakdown: %v", err)
+		}
+	}
+
+	// Build browser donut
+	browserDonutPalette := []string{"#58a6ff", "#3fb950", "#d29922", "#f85149", "#8b5cf6", "#06b6d4", "#ec4899", "#64748b"}
+	var browserDonut []DonutSegment
+	for i, b := range browsers {
+		browserDonut = append(browserDonut, DonutSegment{
+			Label: b.Browser,
+			Count: b.Count,
+			Color: browserDonutPalette[i%len(browserDonutPalette)],
+		})
+	}
+	computeDonutPositions(browserDonut)
+
+	// Build OS donut
+	osDonutPalette := []string{"#58a6ff", "#3fb950", "#d29922", "#f85149", "#8b5cf6", "#06b6d4", "#ec4899", "#64748b"}
+	var osDonut []DonutSegment
+	for i, o := range osStats {
+		osDonut = append(osDonut, DonutSegment{
+			Label: o.OS,
+			Count: o.Count,
+			Color: osDonutPalette[i%len(osDonutPalette)],
+		})
+	}
+	computeDonutPositions(osDonut)
+
+	// Compute mobile vs desktop from OS data
+	var mobileCount, desktopCount int64
+	for _, o := range osStats {
+		switch o.OS {
+		case "iOS", "Android":
+			mobileCount += o.Count
+		case "Windows", "macOS", "Linux", "ChromeOS":
+			desktopCount += o.Count
+		}
+	}
+	totalDevices := mobileCount + desktopCount
+	mobilePct := 0.0
+	desktopPct := 0.0
+	if totalDevices > 0 {
+		mobilePct = float64(mobileCount) / float64(totalDevices) * 100
+		desktopPct = float64(desktopCount) / float64(totalDevices) * 100
+	}
+
+	// Max values for new panel bar charts
+	maxCountry := int64(1)
+	for _, c := range countries {
+		if c.Count > maxCountry {
+			maxCountry = c.Count
+		}
+	}
+
+	maxBrowser := int64(1)
+	for _, b := range browsers {
+		if b.Count > maxBrowser {
+			maxBrowser = b.Count
+		}
+	}
+
+	maxOS := int64(1)
+	for _, o := range osStats {
+		if o.Count > maxOS {
+			maxOS = o.Count
+		}
+	}
+
+	maxDurationHist := int64(1)
+	for _, d := range durationHist {
+		if d.Count > maxDurationHist {
+			maxDurationHist = d.Count
+		}
+	}
+
+	maxBandwidth := int64(1)
+	for _, b := range bandwidthChart {
+		if b.Count > maxBandwidth {
+			maxBandwidth = b.Count
+		}
+	}
+
+	maxResponseTime := int64(1)
+	for _, r := range responseTimeChart {
+		if r.Count > maxResponseTime {
+			maxResponseTime = r.Count
+		}
+	}
+
 	// Fetch available routers for filter dropdown
 	routers, err := s.queries.Routers()
 	if err != nil {
@@ -451,8 +596,26 @@ func (s *Server) getOverviewData(c *fiber.Ctx) (*OverviewData, error) {
 		StatusDonut:     statusDonut,
 		MethodDonut:     methodDonut,
 		UserAgentDonut:  userAgentDonut,
-		HourVisitors:    hourVisitors,
-		MaxHourVisitors: maxHourVisitors,
+		HourVisitors:      hourVisitors,
+		MaxHourVisitors:   maxHourVisitors,
+		Countries:         countries,
+		Browsers:          browsers,
+		OSStats:           osStats,
+		BrowserDonut:      browserDonut,
+		OSDonut:           osDonut,
+		DurationHist:      durationHist,
+		Percentiles:       percentiles,
+		BandwidthChart:    bandwidthChart,
+		ResponseTimeChart: responseTimeChart,
+		MobilePct:         mobilePct,
+		DesktopPct:        desktopPct,
+		GeoIPEnabled:      geoIPEnabled,
+		MaxCountry:        maxCountry,
+		MaxBrowser:        maxBrowser,
+		MaxOS:             maxOS,
+		MaxDurationHist:   maxDurationHist,
+		MaxBandwidth:      maxBandwidth,
+		MaxResponseTime:   maxResponseTime,
 	}, nil
 }
 

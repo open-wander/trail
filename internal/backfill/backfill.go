@@ -50,7 +50,7 @@ func Run(ctx context.Context, db *sql.DB, logPath string, p *parser.Parser) erro
 
 	// Create dedicated aggregator + channel for backfill
 	lines := make(chan string, 10000)
-	agg := aggregator.New(db, p)
+	agg := aggregator.New(db, p, "")
 
 	// Run aggregator in background
 	aggDone := make(chan error, 1)

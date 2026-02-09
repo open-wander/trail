@@ -73,6 +73,81 @@ func isBot(userAgent string) bool {
 	return false
 }
 
+// ClassifyBrowser returns a high-level browser name from the User-Agent string.
+// Returns one of: "Chrome", "Firefox", "Safari", "Edge", "Opera", "Bot", "Unknown", or "Other".
+// Order matters: Edge before Chrome (Edge UA contains "chrome/"), Chrome before Safari.
+func ClassifyBrowser(ua string) string {
+	lower := strings.ToLower(ua)
+
+	if lower == "" || lower == "-" {
+		return "Unknown"
+	}
+
+	if isBot(ua) {
+		return "Bot"
+	}
+
+	// Edge contains both "edg/" and "chrome/"
+	if strings.Contains(lower, "edg/") {
+		return "Edge"
+	}
+	// Opera (modern uses OPR/)
+	if strings.Contains(lower, "opr/") || strings.Contains(lower, "opera/") {
+		return "Opera"
+	}
+	// Chrome (must come before Safari since Chrome UA contains "safari/")
+	if strings.Contains(lower, "chrome/") || strings.Contains(lower, "chromium/") {
+		return "Chrome"
+	}
+	// Firefox
+	if strings.Contains(lower, "firefox/") {
+		return "Firefox"
+	}
+	// Safari (only if no chrome - already filtered above)
+	if strings.Contains(lower, "safari/") {
+		return "Safari"
+	}
+
+	return "Other"
+}
+
+// ClassifyOS returns the operating system from the User-Agent string.
+// Returns one of: "Windows", "macOS", "Linux", "iOS", "Android", "ChromeOS", or "Other".
+// Check mobile OS before desktop (iPhone before macOS).
+func ClassifyOS(ua string) string {
+	lower := strings.ToLower(ua)
+
+	if lower == "" || lower == "-" {
+		return "Other"
+	}
+
+	// Mobile OS first
+	if strings.Contains(lower, "iphone") || strings.Contains(lower, "ipad") || strings.Contains(lower, "ipod") {
+		return "iOS"
+	}
+	if strings.Contains(lower, "android") {
+		return "Android"
+	}
+
+	// ChromeOS before Linux (CrOS UA also contains "linux")
+	if strings.Contains(lower, "cros") {
+		return "ChromeOS"
+	}
+
+	// Desktop OS
+	if strings.Contains(lower, "windows") {
+		return "Windows"
+	}
+	if strings.Contains(lower, "macintosh") || strings.Contains(lower, "mac os") {
+		return "macOS"
+	}
+	if strings.Contains(lower, "linux") {
+		return "Linux"
+	}
+
+	return "Other"
+}
+
 // ClassifyUA returns a display category for the User-Agent.
 // Used for the user_agents table to group by browser/bot type.
 func ClassifyUA(userAgent string) string {

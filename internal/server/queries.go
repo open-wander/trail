@@ -1442,3 +1442,346 @@ func (q *Queries) PathDailyTrends(f Filter, paths []string) (map[string][]int64,
 
 	return result, rows.Err()
 }
+
+// CountryStat represents statistics for a single country
+type CountryStat struct {
+	Country string
+	Count   int64
+	Pct     float64
+}
+
+// BrowserStat represents statistics for a browser
+type BrowserStat struct {
+	Browser string
+	Count   int64
+	Pct     float64
+}
+
+// OSStat represents statistics for an operating system
+type OSStat struct {
+	OS    string
+	Count int64
+	Pct   float64
+}
+
+// DurationBucketStat represents a histogram bucket for response times
+type DurationBucketStat struct {
+	Bucket string
+	Count  int64
+	Pct    float64
+}
+
+// PercentileResult holds computed response time percentiles
+type PercentileResult struct {
+	P50 int64
+	P95 int64
+	P99 int64
+}
+
+// CountryBreakdown returns country distribution from GeoIP data
+func (q *Queries) CountryBreakdown(f Filter, limit int) ([]CountryStat, error) {
+	where, args := buildWhere(f)
+
+	query := fmt.Sprintf(`
+		SELECT country, SUM(count) as total
+		FROM countries
+		%s
+		GROUP BY country
+		ORDER BY total DESC
+		LIMIT ?
+	`, where)
+
+	args = append(args, limit)
+	rows, err := q.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []CountryStat
+	var grandTotal int64
+	for rows.Next() {
+		var stat CountryStat
+		if err := rows.Scan(&stat.Country, &stat.Count); err != nil {
+			return nil, err
+		}
+		grandTotal += stat.Count
+		results = append(results, stat)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	for i := range results {
+		if grandTotal > 0 {
+			results[i].Pct = float64(results[i].Count) / float64(grandTotal) * 100
+		}
+	}
+
+	return results, nil
+}
+
+// BrowserBreakdown returns browser distribution
+func (q *Queries) BrowserBreakdown(f Filter) ([]BrowserStat, error) {
+	where, args := buildWhere(f)
+
+	query := fmt.Sprintf(`
+		SELECT browser, SUM(count) as total
+		FROM browsers
+		%s
+		GROUP BY browser
+		ORDER BY total DESC
+	`, where)
+
+	rows, err := q.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []BrowserStat
+	var grandTotal int64
+	for rows.Next() {
+		var stat BrowserStat
+		if err := rows.Scan(&stat.Browser, &stat.Count); err != nil {
+			return nil, err
+		}
+		grandTotal += stat.Count
+		results = append(results, stat)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	for i := range results {
+		if grandTotal > 0 {
+			results[i].Pct = float64(results[i].Count) / float64(grandTotal) * 100
+		}
+	}
+
+	return results, nil
+}
+
+// OSBreakdown returns operating system distribution
+func (q *Queries) OSBreakdown(f Filter) ([]OSStat, error) {
+	where, args := buildWhere(f)
+
+	query := fmt.Sprintf(`
+		SELECT os, SUM(count) as total
+		FROM os_stats
+		%s
+		GROUP BY os
+		ORDER BY total DESC
+	`, where)
+
+	rows, err := q.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []OSStat
+	var grandTotal int64
+	for rows.Next() {
+		var stat OSStat
+		if err := rows.Scan(&stat.OS, &stat.Count); err != nil {
+			return nil, err
+		}
+		grandTotal += stat.Count
+		results = append(results, stat)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	for i := range results {
+		if grandTotal > 0 {
+			results[i].Pct = float64(results[i].Count) / float64(grandTotal) * 100
+		}
+	}
+
+	return results, nil
+}
+
+// DurationHistogram returns the response time histogram
+func (q *Queries) DurationHistogram(f Filter) ([]DurationBucketStat, error) {
+	where, args := buildWhere(f)
+
+	query := fmt.Sprintf(`
+		SELECT bucket, SUM(count) as total
+		FROM duration_hist
+		%s
+		GROUP BY bucket
+		ORDER BY
+			CASE bucket
+				WHEN '0-10ms' THEN 1
+				WHEN '10-50ms' THEN 2
+				WHEN '50-100ms' THEN 3
+				WHEN '100-500ms' THEN 4
+				WHEN '500-1000ms' THEN 5
+				WHEN '1000+ms' THEN 6
+			END
+	`, where)
+
+	rows, err := q.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []DurationBucketStat
+	var grandTotal int64
+	for rows.Next() {
+		var stat DurationBucketStat
+		if err := rows.Scan(&stat.Bucket, &stat.Count); err != nil {
+			return nil, err
+		}
+		grandTotal += stat.Count
+		results = append(results, stat)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	for i := range results {
+		if grandTotal > 0 {
+			results[i].Pct = float64(results[i].Count) / float64(grandTotal) * 100
+		}
+	}
+
+	return results, nil
+}
+
+// DurationPercentiles computes p50, p95, p99 from the duration histogram buckets.
+// Uses bucket midpoints for interpolation: 5, 30, 75, 300, 750, 2000ms.
+func (q *Queries) DurationPercentiles(f Filter) (*PercentileResult, error) {
+	hist, err := q.DurationHistogram(f)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(hist) == 0 {
+		return &PercentileResult{}, nil
+	}
+
+	// Bucket midpoints in ms (ordered by bucket)
+	midpoints := map[string]int64{
+		"0-10ms":    5,
+		"10-50ms":   30,
+		"50-100ms":  75,
+		"100-500ms": 300,
+		"500-1000ms": 750,
+		"1000+ms":   2000,
+	}
+
+	// Build cumulative distribution
+	var total int64
+	for _, h := range hist {
+		total += h.Count
+	}
+	if total == 0 {
+		return &PercentileResult{}, nil
+	}
+
+	// Compute percentiles from cumulative counts
+	computePercentile := func(pct float64) int64 {
+		threshold := int64(float64(total) * pct)
+		cumulative := int64(0)
+		for _, h := range hist {
+			cumulative += h.Count
+			if cumulative >= threshold {
+				return midpoints[h.Bucket]
+			}
+		}
+		// Fallback to last bucket midpoint
+		if len(hist) > 0 {
+			return midpoints[hist[len(hist)-1].Bucket]
+		}
+		return 0
+	}
+
+	return &PercentileResult{
+		P50: computePercentile(0.50),
+		P95: computePercentile(0.95),
+		P99: computePercentile(0.99),
+	}, nil
+}
+
+// BandwidthTimeSeries returns bytes transferred over time (hourly or daily)
+func (q *Queries) BandwidthTimeSeries(f Filter, daily bool) ([]TimeSeriesPoint, error) {
+	where, args := buildWhere(f)
+
+	var groupExpr, selectExpr string
+	if daily {
+		selectExpr = "SUBSTR(hour, 1, 10) as period"
+		groupExpr = "period"
+	} else {
+		selectExpr = "hour as period"
+		groupExpr = "period"
+	}
+
+	query := fmt.Sprintf(`
+		SELECT %s, SUM(bytes) as total_bytes
+		FROM requests
+		%s
+		GROUP BY %s
+		ORDER BY %s
+	`, selectExpr, where, groupExpr, groupExpr)
+
+	rows, err := q.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []TimeSeriesPoint
+	for rows.Next() {
+		var point TimeSeriesPoint
+		if err := rows.Scan(&point.Label, &point.Count); err != nil {
+			return nil, err
+		}
+		results = append(results, point)
+	}
+
+	return results, rows.Err()
+}
+
+// ResponseTimeTimeSeries returns average response time over time (hourly or daily)
+func (q *Queries) ResponseTimeTimeSeries(f Filter, daily bool) ([]TimeSeriesPoint, error) {
+	where, args := buildWhere(f)
+
+	var groupExpr, selectExpr string
+	if daily {
+		selectExpr = "SUBSTR(hour, 1, 10) as period"
+		groupExpr = "period"
+	} else {
+		selectExpr = "hour as period"
+		groupExpr = "period"
+	}
+
+	query := fmt.Sprintf(`
+		SELECT %s,
+			CASE WHEN SUM(count) > 0 THEN SUM(duration) / SUM(count) ELSE 0 END as avg_ms
+		FROM requests
+		%s
+		GROUP BY %s
+		ORDER BY %s
+	`, selectExpr, where, groupExpr, groupExpr)
+
+	rows, err := q.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []TimeSeriesPoint
+	for rows.Next() {
+		var point TimeSeriesPoint
+		if err := rows.Scan(&point.Label, &point.Count); err != nil {
+			return nil, err
+		}
+		results = append(results, point)
+	}
+
+	return results, rows.Err()
+}

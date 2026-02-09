@@ -29,7 +29,7 @@ func TestSmokeImportSampleLog(t *testing.T) {
 	defer database.Close()
 
 	// Create aggregator and lines channel
-	agg := aggregator.New(database, nil)
+	agg := aggregator.New(database, nil, "")
 	lines := make(chan string, 10000)
 
 	// Start aggregator in background

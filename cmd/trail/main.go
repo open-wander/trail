@@ -59,7 +59,7 @@ func main() {
 
 	// Create components
 	tail := tailer.New(cfg.LogFile, database)
-	agg := aggregator.New(database, p)
+	agg := aggregator.New(database, p, cfg.GeoIPPath)
 	cleaner := retention.New(database, cfg.RetentionDays)
 	srv := server.New(cfg, database, trail.TemplatesFS, trail.StaticFS)
 

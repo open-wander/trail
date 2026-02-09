@@ -78,7 +78,7 @@ func unroutedEntry(ip string, timestamp time.Time, path string) *parser.LogEntry
 
 func TestAccumulateAndFlush(t *testing.T) {
 	db := testDB(t)
-	agg := New(db, nil)
+	agg := New(db, nil, "")
 	ctx := context.Background()
 
 	ts := time.Date(2026, 1, 7, 16, 30, 0, 0, time.UTC)
@@ -136,7 +136,7 @@ func TestAccumulateAndFlush(t *testing.T) {
 
 func TestUpsertLogic(t *testing.T) {
 	db := testDB(t)
-	agg := New(db, nil)
+	agg := New(db, nil, "")
 	ctx := context.Background()
 
 	ts := time.Date(2026, 1, 7, 16, 30, 0, 0, time.UTC)
@@ -221,7 +221,7 @@ func TestUpsertLogic(t *testing.T) {
 
 func TestVisitorDeduplication(t *testing.T) {
 	db := testDB(t)
-	agg := New(db, nil)
+	agg := New(db, nil, "")
 	ctx := context.Background()
 
 	ts := time.Date(2026, 1, 7, 16, 30, 0, 0, time.UTC)
@@ -280,7 +280,7 @@ func TestVisitorDeduplication(t *testing.T) {
 
 func TestReferrerDomainExtraction(t *testing.T) {
 	db := testDB(t)
-	agg := New(db, nil)
+	agg := New(db, nil, "")
 	ctx := context.Background()
 
 	ts := time.Date(2026, 1, 7, 16, 30, 0, 0, time.UTC)
@@ -322,7 +322,7 @@ func TestReferrerDomainExtraction(t *testing.T) {
 
 func TestBotTrafficExcluded(t *testing.T) {
 	db := testDB(t)
-	agg := New(db, nil)
+	agg := New(db, nil, "")
 	ctx := context.Background()
 
 	ts := time.Date(2026, 1, 7, 16, 30, 0, 0, time.UTC)
@@ -371,7 +371,7 @@ func TestBotTrafficExcluded(t *testing.T) {
 
 func TestUnroutedTrafficExcluded(t *testing.T) {
 	db := testDB(t)
-	agg := New(db, nil)
+	agg := New(db, nil, "")
 	ctx := context.Background()
 
 	ts := time.Date(2026, 1, 7, 16, 30, 0, 0, time.UTC)
@@ -422,7 +422,7 @@ func TestUnroutedTrafficExcluded(t *testing.T) {
 
 func TestEmptyFlush(t *testing.T) {
 	db := testDB(t)
-	agg := New(db, nil)
+	agg := New(db, nil, "")
 	ctx := context.Background()
 
 	// Flush without accumulating anything
@@ -455,7 +455,7 @@ func TestEmptyFlush(t *testing.T) {
 
 func TestMultipleRouters(t *testing.T) {
 	db := testDB(t)
-	agg := New(db, nil)
+	agg := New(db, nil, "")
 	ctx := context.Background()
 
 	ts := time.Date(2026, 1, 7, 16, 30, 0, 0, time.UTC)
@@ -496,7 +496,7 @@ func TestMultipleRouters(t *testing.T) {
 
 func TestReferrerUpsert(t *testing.T) {
 	db := testDB(t)
-	agg := New(db, nil)
+	agg := New(db, nil, "")
 	ctx := context.Background()
 
 	ts := time.Date(2026, 1, 7, 16, 30, 0, 0, time.UTC)
@@ -548,7 +548,7 @@ func TestReferrerUpsert(t *testing.T) {
 
 func TestUserAgentUpsert(t *testing.T) {
 	db := testDB(t)
-	agg := New(db, nil)
+	agg := New(db, nil, "")
 	ctx := context.Background()
 
 	ts := time.Date(2026, 1, 7, 16, 30, 0, 0, time.UTC)

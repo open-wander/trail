@@ -18,6 +18,9 @@ type Config struct {
 	HtpasswdFile string // Path to htpasswd file for authentication
 	AuthUser     string // Basic auth username (plaintext)
 	AuthPass     string // Basic auth password (plaintext)
+
+	// GeoIP settings (optional)
+	GeoIPPath string // Path to MaxMind/DB-IP mmdb file for country lookup
 }
 
 // Load reads configuration from environment variables and applies defaults
@@ -30,6 +33,7 @@ func Load() (*Config, error) {
 		HtpasswdFile:  os.Getenv("TRAIL_HTPASSWD_FILE"),
 		AuthUser:      os.Getenv("TRAIL_AUTH_USER"),
 		AuthPass:      os.Getenv("TRAIL_AUTH_PASS"),
+		GeoIPPath:     os.Getenv("TRAIL_GEOIP_PATH"),
 	}
 
 	// Parse retention days with default

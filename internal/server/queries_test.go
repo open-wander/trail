@@ -1712,3 +1712,430 @@ func TestPathDailyTrends(t *testing.T) {
 		t.Fatalf("/api trend length = %d, want 2", len(apiTrend))
 	}
 }
+
+// Seed helpers for new tables
+
+type countryRow struct {
+	Hour    string
+	Router  string
+	Country string
+	Count   int
+}
+
+func seedCountries(t *testing.T, db *sql.DB, rows ...countryRow) {
+	t.Helper()
+	for _, r := range rows {
+		_, err := db.Exec(
+			"INSERT INTO countries (hour, router, country, count) VALUES (?, ?, ?, ?)",
+			r.Hour, r.Router, r.Country, r.Count,
+		)
+		if err != nil {
+			t.Fatalf("failed to seed country: %v", err)
+		}
+	}
+}
+
+type browserRow struct {
+	Hour    string
+	Router  string
+	Browser string
+	Count   int
+}
+
+func seedBrowsers(t *testing.T, db *sql.DB, rows ...browserRow) {
+	t.Helper()
+	for _, r := range rows {
+		_, err := db.Exec(
+			"INSERT INTO browsers (hour, router, browser, count) VALUES (?, ?, ?, ?)",
+			r.Hour, r.Router, r.Browser, r.Count,
+		)
+		if err != nil {
+			t.Fatalf("failed to seed browser: %v", err)
+		}
+	}
+}
+
+type osRow struct {
+	Hour   string
+	Router string
+	OS     string
+	Count  int
+}
+
+func seedOSStats(t *testing.T, db *sql.DB, rows ...osRow) {
+	t.Helper()
+	for _, r := range rows {
+		_, err := db.Exec(
+			"INSERT INTO os_stats (hour, router, os, count) VALUES (?, ?, ?, ?)",
+			r.Hour, r.Router, r.OS, r.Count,
+		)
+		if err != nil {
+			t.Fatalf("failed to seed os_stat: %v", err)
+		}
+	}
+}
+
+type durationHistRow struct {
+	Hour   string
+	Router string
+	Bucket string
+	Count  int
+}
+
+func seedDurationHist(t *testing.T, db *sql.DB, rows ...durationHistRow) {
+	t.Helper()
+	for _, r := range rows {
+		_, err := db.Exec(
+			"INSERT INTO duration_hist (hour, router, bucket, count) VALUES (?, ?, ?, ?)",
+			r.Hour, r.Router, r.Bucket, r.Count,
+		)
+		if err != nil {
+			t.Fatalf("failed to seed duration_hist: %v", err)
+		}
+	}
+}
+
+func TestCountryBreakdown(t *testing.T) {
+	db := testDB(t)
+	q := NewQueries(db)
+
+	seedCountries(t, db,
+		countryRow{"2026-02-08T00:00:00Z", "web", "US", 500},
+		countryRow{"2026-02-08T00:00:00Z", "web", "DE", 200},
+		countryRow{"2026-02-08T00:00:00Z", "web", "JP", 100},
+		countryRow{"2026-02-08T01:00:00Z", "web", "US", 300},
+		countryRow{"2026-02-08T00:00:00Z", "unrouted", "CN", 1000},
+	)
+
+	tests := []struct {
+		name    string
+		filter  Filter
+		limit   int
+		wantLen int
+		wantTop string
+	}{
+		{
+			name: "exclude bots top 3",
+			filter: Filter{
+				From:        "2026-02-08T00:00:00Z",
+				To:          "2026-02-08T23:00:00Z",
+				IncludeBots: false,
+			},
+			limit:   3,
+			wantLen: 3,
+			wantTop: "US",
+		},
+		{
+			name: "include bots top 2",
+			filter: Filter{
+				From:        "2026-02-08T00:00:00Z",
+				To:          "2026-02-08T23:00:00Z",
+				IncludeBots: true,
+			},
+			limit:   2,
+			wantLen: 2,
+			wantTop: "CN",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := q.CountryBreakdown(tt.filter, tt.limit)
+			if err != nil {
+				t.Fatalf("CountryBreakdown() error = %v", err)
+			}
+			if len(got) != tt.wantLen {
+				t.Errorf("CountryBreakdown() returned %d rows, want %d", len(got), tt.wantLen)
+			}
+			if len(got) > 0 && got[0].Country != tt.wantTop {
+				t.Errorf("CountryBreakdown() top = %q, want %q", got[0].Country, tt.wantTop)
+			}
+			if len(got) > 0 && got[0].Pct <= 0 {
+				t.Error("CountryBreakdown() top Pct should be > 0")
+			}
+		})
+	}
+}
+
+func TestBrowserBreakdown(t *testing.T) {
+	db := testDB(t)
+	q := NewQueries(db)
+
+	seedBrowsers(t, db,
+		browserRow{"2026-02-08T00:00:00Z", "web", "Chrome", 500},
+		browserRow{"2026-02-08T00:00:00Z", "web", "Firefox", 200},
+		browserRow{"2026-02-08T00:00:00Z", "web", "Safari", 100},
+		browserRow{"2026-02-08T00:00:00Z", "web", "Bot", 300},
+	)
+
+	f := Filter{
+		From:        "2026-02-08T00:00:00Z",
+		To:          "2026-02-08T23:00:00Z",
+		IncludeBots: true,
+	}
+
+	got, err := q.BrowserBreakdown(f)
+	if err != nil {
+		t.Fatalf("BrowserBreakdown() error = %v", err)
+	}
+	if len(got) != 4 {
+		t.Errorf("BrowserBreakdown() returned %d rows, want 4", len(got))
+	}
+	if len(got) > 0 && got[0].Browser != "Chrome" {
+		t.Errorf("BrowserBreakdown() top = %q, want Chrome", got[0].Browser)
+	}
+	// Percentages should sum to ~100
+	var totalPct float64
+	for _, b := range got {
+		totalPct += b.Pct
+	}
+	if totalPct < 99 || totalPct > 101 {
+		t.Errorf("BrowserBreakdown() pct sum = %.1f, want ~100", totalPct)
+	}
+}
+
+func TestOSBreakdown(t *testing.T) {
+	db := testDB(t)
+	q := NewQueries(db)
+
+	seedOSStats(t, db,
+		osRow{"2026-02-08T00:00:00Z", "web", "Windows", 400},
+		osRow{"2026-02-08T00:00:00Z", "web", "macOS", 300},
+		osRow{"2026-02-08T00:00:00Z", "web", "iOS", 150},
+		osRow{"2026-02-08T00:00:00Z", "web", "Android", 100},
+		osRow{"2026-02-08T00:00:00Z", "web", "Linux", 50},
+	)
+
+	f := Filter{
+		From:        "2026-02-08T00:00:00Z",
+		To:          "2026-02-08T23:00:00Z",
+		IncludeBots: true,
+	}
+
+	got, err := q.OSBreakdown(f)
+	if err != nil {
+		t.Fatalf("OSBreakdown() error = %v", err)
+	}
+	if len(got) != 5 {
+		t.Errorf("OSBreakdown() returned %d rows, want 5", len(got))
+	}
+	if len(got) > 0 && got[0].OS != "Windows" {
+		t.Errorf("OSBreakdown() top = %q, want Windows", got[0].OS)
+	}
+}
+
+func TestDurationHistogram(t *testing.T) {
+	db := testDB(t)
+	q := NewQueries(db)
+
+	seedDurationHist(t, db,
+		durationHistRow{"2026-02-08T00:00:00Z", "web", "0-10ms", 1000},
+		durationHistRow{"2026-02-08T00:00:00Z", "web", "10-50ms", 500},
+		durationHistRow{"2026-02-08T00:00:00Z", "web", "50-100ms", 200},
+		durationHistRow{"2026-02-08T00:00:00Z", "web", "100-500ms", 100},
+		durationHistRow{"2026-02-08T00:00:00Z", "web", "500-1000ms", 30},
+		durationHistRow{"2026-02-08T00:00:00Z", "web", "1000+ms", 10},
+	)
+
+	f := Filter{
+		From:        "2026-02-08T00:00:00Z",
+		To:          "2026-02-08T23:00:00Z",
+		IncludeBots: true,
+	}
+
+	got, err := q.DurationHistogram(f)
+	if err != nil {
+		t.Fatalf("DurationHistogram() error = %v", err)
+	}
+	if len(got) != 6 {
+		t.Errorf("DurationHistogram() returned %d rows, want 6", len(got))
+	}
+	// Should be ordered by bucket
+	if len(got) > 0 && got[0].Bucket != "0-10ms" {
+		t.Errorf("DurationHistogram() first bucket = %q, want 0-10ms", got[0].Bucket)
+	}
+	if len(got) > 5 && got[5].Bucket != "1000+ms" {
+		t.Errorf("DurationHistogram() last bucket = %q, want 1000+ms", got[5].Bucket)
+	}
+}
+
+func TestDurationPercentiles(t *testing.T) {
+	db := testDB(t)
+	q := NewQueries(db)
+
+	// 90% of requests in 0-10ms bucket -> p50 should be 5ms
+	seedDurationHist(t, db,
+		durationHistRow{"2026-02-08T00:00:00Z", "web", "0-10ms", 900},
+		durationHistRow{"2026-02-08T00:00:00Z", "web", "10-50ms", 50},
+		durationHistRow{"2026-02-08T00:00:00Z", "web", "50-100ms", 30},
+		durationHistRow{"2026-02-08T00:00:00Z", "web", "100-500ms", 15},
+		durationHistRow{"2026-02-08T00:00:00Z", "web", "500-1000ms", 4},
+		durationHistRow{"2026-02-08T00:00:00Z", "web", "1000+ms", 1},
+	)
+
+	f := Filter{
+		From:        "2026-02-08T00:00:00Z",
+		To:          "2026-02-08T23:00:00Z",
+		IncludeBots: true,
+	}
+
+	got, err := q.DurationPercentiles(f)
+	if err != nil {
+		t.Fatalf("DurationPercentiles() error = %v", err)
+	}
+	if got.P50 != 5 {
+		t.Errorf("P50 = %d, want 5", got.P50)
+	}
+	// p95 at 950th request -> cumulative 900+50=950 -> still in 10-50ms bucket
+	if got.P95 != 30 {
+		t.Errorf("P95 = %d, want 30", got.P95)
+	}
+	// p99 at 990th request -> cumulative 900+50+30+15=995 -> in 100-500ms bucket
+	if got.P99 != 300 {
+		t.Errorf("P99 = %d, want 300", got.P99)
+	}
+}
+
+func TestDurationPercentilesEmpty(t *testing.T) {
+	db := testDB(t)
+	q := NewQueries(db)
+
+	f := Filter{
+		From:        "2026-02-08T00:00:00Z",
+		To:          "2026-02-08T23:00:00Z",
+		IncludeBots: true,
+	}
+
+	got, err := q.DurationPercentiles(f)
+	if err != nil {
+		t.Fatalf("DurationPercentiles() error = %v", err)
+	}
+	if got.P50 != 0 || got.P95 != 0 || got.P99 != 0 {
+		t.Errorf("DurationPercentiles() on empty DB = %+v, want all zeros", got)
+	}
+}
+
+func TestBandwidthTimeSeries(t *testing.T) {
+	db := testDB(t)
+	q := NewQueries(db)
+
+	seedRequests(t, db,
+		requestRow{"2026-02-08T00:00:00Z", "web", "/", "GET", 200, 100, 50000, 1000000},
+		requestRow{"2026-02-08T01:00:00Z", "web", "/", "GET", 200, 50, 25000, 500000},
+		requestRow{"2026-02-08T01:00:00Z", "web", "/api", "GET", 200, 30, 15000, 300000},
+	)
+
+	f := Filter{
+		From:        "2026-02-08T00:00:00Z",
+		To:          "2026-02-08T23:00:00Z",
+		IncludeBots: true,
+	}
+
+	got, err := q.BandwidthTimeSeries(f, false)
+	if err != nil {
+		t.Fatalf("BandwidthTimeSeries() error = %v", err)
+	}
+	if len(got) != 2 {
+		t.Errorf("BandwidthTimeSeries() returned %d rows, want 2", len(got))
+	}
+	// Hour 00: 50000 bytes
+	if len(got) > 0 && got[0].Count != 50000 {
+		t.Errorf("hour 0 bytes = %d, want 50000", got[0].Count)
+	}
+	// Hour 01: 25000 + 15000 = 40000 bytes
+	if len(got) > 1 && got[1].Count != 40000 {
+		t.Errorf("hour 1 bytes = %d, want 40000", got[1].Count)
+	}
+}
+
+func TestResponseTimeTimeSeries(t *testing.T) {
+	db := testDB(t)
+	q := NewQueries(db)
+
+	// hour 00: 100 requests, 1000000 total ms -> avg 10000ms
+	// hour 01: 80 requests, 400000 total ms -> avg 5000ms
+	seedRequests(t, db,
+		requestRow{"2026-02-08T00:00:00Z", "web", "/", "GET", 200, 100, 50000, 1000000},
+		requestRow{"2026-02-08T01:00:00Z", "web", "/", "GET", 200, 80, 40000, 400000},
+	)
+
+	f := Filter{
+		From:        "2026-02-08T00:00:00Z",
+		To:          "2026-02-08T23:00:00Z",
+		IncludeBots: true,
+	}
+
+	got, err := q.ResponseTimeTimeSeries(f, false)
+	if err != nil {
+		t.Fatalf("ResponseTimeTimeSeries() error = %v", err)
+	}
+	if len(got) != 2 {
+		t.Errorf("ResponseTimeTimeSeries() returned %d rows, want 2", len(got))
+	}
+	if len(got) > 0 && got[0].Count != 10000 {
+		t.Errorf("hour 0 avg_ms = %d, want 10000", got[0].Count)
+	}
+	if len(got) > 1 && got[1].Count != 5000 {
+		t.Errorf("hour 1 avg_ms = %d, want 5000", got[1].Count)
+	}
+}
+
+func TestNewQueriesEmptyResults(t *testing.T) {
+	db := testDB(t)
+	q := NewQueries(db)
+
+	f := Filter{
+		From:        "2026-02-08T00:00:00Z",
+		To:          "2026-02-08T23:00:00Z",
+		IncludeBots: true,
+	}
+
+	// All new queries should return empty results without errors on empty DB
+	countries, err := q.CountryBreakdown(f, 10)
+	if err != nil {
+		t.Fatalf("CountryBreakdown() error = %v", err)
+	}
+	if len(countries) != 0 {
+		t.Errorf("CountryBreakdown() on empty DB returned %d rows", len(countries))
+	}
+
+	browsers, err := q.BrowserBreakdown(f)
+	if err != nil {
+		t.Fatalf("BrowserBreakdown() error = %v", err)
+	}
+	if len(browsers) != 0 {
+		t.Errorf("BrowserBreakdown() on empty DB returned %d rows", len(browsers))
+	}
+
+	osStats, err := q.OSBreakdown(f)
+	if err != nil {
+		t.Fatalf("OSBreakdown() error = %v", err)
+	}
+	if len(osStats) != 0 {
+		t.Errorf("OSBreakdown() on empty DB returned %d rows", len(osStats))
+	}
+
+	hist, err := q.DurationHistogram(f)
+	if err != nil {
+		t.Fatalf("DurationHistogram() error = %v", err)
+	}
+	if len(hist) != 0 {
+		t.Errorf("DurationHistogram() on empty DB returned %d rows", len(hist))
+	}
+
+	bw, err := q.BandwidthTimeSeries(f, false)
+	if err != nil {
+		t.Fatalf("BandwidthTimeSeries() error = %v", err)
+	}
+	if len(bw) != 0 {
+		t.Errorf("BandwidthTimeSeries() on empty DB returned %d rows", len(bw))
+	}
+
+	rt, err := q.ResponseTimeTimeSeries(f, false)
+	if err != nil {
+		t.Fatalf("ResponseTimeTimeSeries() error = %v", err)
+	}
+	if len(rt) != 0 {
+		t.Errorf("ResponseTimeTimeSeries() on empty DB returned %d rows", len(rt))
+	}
+}

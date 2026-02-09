@@ -17,6 +17,30 @@
         <span class="stat-value">{{.Stats.AvgMs}} ms</span>
         <span class="stat-label">Avg Response Time</span>
     </div>
+    {{if .Percentiles}}
+    <div class="stat">
+        <span class="stat-value">{{.Percentiles.P50}} ms</span>
+        <span class="stat-label">p50 Latency</span>
+    </div>
+    <div class="stat">
+        <span class="stat-value">{{.Percentiles.P95}} ms</span>
+        <span class="stat-label">p95 Latency</span>
+    </div>
+    <div class="stat">
+        <span class="stat-value">{{.Percentiles.P99}} ms</span>
+        <span class="stat-label">p99 Latency</span>
+    </div>
+    {{end}}
+    {{if or (gt .MobilePct 0) (gt .DesktopPct 0)}}
+    <div class="stat">
+        <span class="stat-value">{{formatPct .MobilePct}}</span>
+        <span class="stat-label">Mobile</span>
+    </div>
+    <div class="stat">
+        <span class="stat-value">{{formatPct .DesktopPct}}</span>
+        <span class="stat-label">Desktop</span>
+    </div>
+    {{end}}
 </div>
 {{end}}
 
@@ -269,6 +293,163 @@
         {{end}}
     {{else}}
         <p class="text-secondary">No user agent data available.</p>
+    {{end}}
+</div>
+
+</div><!-- end panel-grid -->
+
+<!-- Browser and OS Distribution -->
+<div class="panel-grid">
+
+<!-- Browser Distribution -->
+<div class="card">
+    <div class="card-header">Browser Distribution</div>
+    {{if .Browsers}}
+        {{if .BrowserDonut}}
+        <div class="donut-container">
+            <div class="donut" style="background: {{conicGradient .BrowserDonut}};"></div>
+            <div class="donut-legend">
+                {{range .BrowserDonut}}
+                <div class="donut-legend-item">
+                    <div class="donut-legend-color" style="background: {{.Color}};"></div>
+                    <span class="donut-legend-label">{{.Label}}</span>
+                    <span class="donut-legend-value">{{formatNumber .Count}} ({{formatPct .Pct}})</span>
+                </div>
+                {{end}}
+            </div>
+        </div>
+        {{end}}
+        {{range .Browsers}}
+        <div class="chart-bar">
+            <div class="chart-bar-label">{{.Browser}}</div>
+            <div class="chart-bar-wrapper">
+                <div class="chart-bar-fill" style="width: {{pct .Count $.MaxBrowser}}%;"></div>
+            </div>
+            <div class="chart-bar-value">{{formatNumber .Count}} <span class="text-secondary text-small">({{formatPct .Pct}})</span></div>
+        </div>
+        {{end}}
+    {{else}}
+        <p class="text-secondary">No browser data available.</p>
+    {{end}}
+</div>
+
+<!-- OS Distribution -->
+<div class="card">
+    <div class="card-header">Operating Systems</div>
+    {{if .OSStats}}
+        {{if .OSDonut}}
+        <div class="donut-container">
+            <div class="donut" style="background: {{conicGradient .OSDonut}};"></div>
+            <div class="donut-legend">
+                {{range .OSDonut}}
+                <div class="donut-legend-item">
+                    <div class="donut-legend-color" style="background: {{.Color}};"></div>
+                    <span class="donut-legend-label">{{.Label}}</span>
+                    <span class="donut-legend-value">{{formatNumber .Count}} ({{formatPct .Pct}})</span>
+                </div>
+                {{end}}
+            </div>
+        </div>
+        {{end}}
+        {{range .OSStats}}
+        <div class="chart-bar">
+            <div class="chart-bar-label">{{.OS}}</div>
+            <div class="chart-bar-wrapper">
+                <div class="chart-bar-fill" style="width: {{pct .Count $.MaxOS}}%;"></div>
+            </div>
+            <div class="chart-bar-value">{{formatNumber .Count}} <span class="text-secondary text-small">({{formatPct .Pct}})</span></div>
+        </div>
+        {{end}}
+    {{else}}
+        <p class="text-secondary">No OS data available.</p>
+    {{end}}
+</div>
+
+</div><!-- end panel-grid -->
+
+<!-- Countries and Response Time Distribution -->
+<div class="panel-grid">
+
+{{if .GeoIPEnabled}}
+<!-- Countries -->
+<div class="card">
+    <div class="card-header">Countries (Top 20)</div>
+    {{if .Countries}}
+        {{range .Countries}}
+        <div class="chart-bar">
+            <div class="chart-bar-label" style="min-width: 30px;">{{.Country}}</div>
+            <div class="chart-bar-wrapper">
+                <div class="chart-bar-fill" style="width: {{pct .Count $.MaxCountry}}%;"></div>
+            </div>
+            <div class="chart-bar-value">{{formatNumber .Count}} <span class="text-secondary text-small">({{formatPct .Pct}})</span></div>
+        </div>
+        {{end}}
+    {{else}}
+        <p class="text-secondary">No country data available.</p>
+    {{end}}
+</div>
+{{end}}
+
+<!-- Response Time Distribution -->
+<div class="card">
+    <div class="card-header">Response Time Distribution</div>
+    {{if .DurationHist}}
+        {{range .DurationHist}}
+        <div class="chart-bar">
+            <div class="chart-bar-label" style="min-width: 90px;">{{.Bucket}}</div>
+            <div class="chart-bar-wrapper">
+                <div class="chart-bar-fill" style="width: {{pct .Count $.MaxDurationHist}}%;"></div>
+            </div>
+            <div class="chart-bar-value">{{formatNumber .Count}} <span class="text-secondary text-small">({{formatPct .Pct}})</span></div>
+        </div>
+        {{end}}
+    {{else}}
+        <p class="text-secondary">No response time data available.</p>
+    {{end}}
+</div>
+
+</div><!-- end panel-grid -->
+
+<!-- Bandwidth and Response Time Over Time -->
+<div class="panel-grid">
+
+<!-- Bandwidth Over Time -->
+<div class="card">
+    <div class="card-header">Bandwidth Over Time</div>
+    {{if .BandwidthChart}}
+        <div class="timeseries-chart">
+            {{range .BandwidthChart}}
+            <div class="timeseries-col">
+                <div class="timeseries-value">{{formatBytes .Count}}</div>
+                <div class="timeseries-bars" style="height: {{pct .Count $.MaxBandwidth}}%;">
+                    <div class="timeseries-bar-hits" style="height: 100%;"></div>
+                </div>
+                <div class="timeseries-label">{{formatTimeLabel .Label}}</div>
+            </div>
+            {{end}}
+        </div>
+    {{else}}
+        <p class="text-secondary">No bandwidth data available.</p>
+    {{end}}
+</div>
+
+<!-- Response Time Trend -->
+<div class="card">
+    <div class="card-header">Response Time Trend</div>
+    {{if .ResponseTimeChart}}
+        <div class="timeseries-chart">
+            {{range .ResponseTimeChart}}
+            <div class="timeseries-col">
+                <div class="timeseries-value">{{.Count}} ms</div>
+                <div class="timeseries-bars" style="height: {{pct .Count $.MaxResponseTime}}%;">
+                    <div class="timeseries-bar-hits" style="height: 100%; background: var(--warning);"></div>
+                </div>
+                <div class="timeseries-label">{{formatTimeLabel .Label}}</div>
+            </div>
+            {{end}}
+        </div>
+    {{else}}
+        <p class="text-secondary">No response time trend data available.</p>
     {{end}}
 </div>
 

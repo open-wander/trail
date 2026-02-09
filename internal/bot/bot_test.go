@@ -121,6 +121,63 @@ func TestClassify(t *testing.T) {
 	}
 }
 
+func TestClassifyBrowser(t *testing.T) {
+	tests := []struct {
+		name      string
+		userAgent string
+		want      string
+	}{
+		{"Chrome desktop", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36", "Chrome"},
+		{"Firefox desktop", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:120.0) Gecko/20100101 Firefox/120.0", "Firefox"},
+		{"Safari desktop", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15", "Safari"},
+		{"Edge desktop", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0", "Edge"},
+		{"Opera desktop", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 OPR/106.0.0.0", "Opera"},
+		{"Chrome mobile", "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36", "Chrome"},
+		{"Googlebot", "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)", "Bot"},
+		{"curl", "curl/7.68.0", "Bot"},
+		{"empty", "", "Unknown"},
+		{"dash", "-", "Unknown"},
+		{"unknown browser", "SomethingWeird/1.0", "Other"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ClassifyBrowser(tt.userAgent)
+			if got != tt.want {
+				t.Errorf("ClassifyBrowser() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestClassifyOS(t *testing.T) {
+	tests := []struct {
+		name      string
+		userAgent string
+		want      string
+	}{
+		{"Windows", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", "Windows"},
+		{"macOS", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36", "macOS"},
+		{"Linux", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36", "Linux"},
+		{"iOS iPhone", "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15", "iOS"},
+		{"iOS iPad", "Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15", "iOS"},
+		{"Android", "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36", "Android"},
+		{"ChromeOS", "Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36", "ChromeOS"},
+		{"empty", "", "Other"},
+		{"dash", "-", "Other"},
+		{"unknown", "SomethingWeird/1.0", "Other"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ClassifyOS(tt.userAgent)
+			if got != tt.want {
+				t.Errorf("ClassifyOS() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestClassifyUA(t *testing.T) {
 	tests := []struct {
 		name      string
