@@ -13,14 +13,10 @@
         <span class="stat-value">{{formatBytes .Stats.Bytes}}</span>
         <span class="stat-label">Total Bandwidth</span>
     </div>
-    <div class="stat">
-        <span class="stat-value">{{.Stats.AvgMs}} ms</span>
-        <span class="stat-label">Avg Response Time</span>
-    </div>
     {{if .Percentiles}}
     <div class="stat">
         <span class="stat-value">{{.Percentiles.P50}} ms</span>
-        <span class="stat-label">p50 Latency</span>
+        <span class="stat-label">Median Response</span>
     </div>
     <div class="stat">
         <span class="stat-value">{{.Percentiles.P95}} ms</span>
