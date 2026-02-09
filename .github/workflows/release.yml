@@ -40,8 +40,6 @@ jobs:
         run: |
           tar czf trail-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz \
             trail-${{ matrix.goos }}-${{ matrix.goarch }} \
-            static/ \
-            templates/ \
             README.md
 
       - uses: actions/upload-artifact@v4
