@@ -1,0 +1,23 @@
+# Binary
+trail
+bin/
+*.exe
+.claude
+
+# Database
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Air
+tmp/
+
+# OS
+.DS_Store

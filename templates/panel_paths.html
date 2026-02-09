@@ -1,0 +1,62 @@
+<div class="card-header">
+    Top Paths
+    <span class="text-secondary text-small">({{formatNumber .TotalCount}} total)</span>
+</div>
+<table>
+    <thead>
+        <tr>
+            <th class="sort-header" hx-get="/api/panel/paths?sort=path&order={{if and (eq .Sort "path") (eq .Order "asc")}}desc{{else}}asc{{end}}&limit={{.Limit}}&page=1" hx-target="#panel-paths" hx-swap="innerHTML" hx-include="#filter-form">
+                Path {{if eq .Sort "path"}}{{if eq .Order "asc"}}&#9650;{{else}}&#9660;{{end}}{{end}}
+            </th>
+            <th class="sort-header" hx-get="/api/panel/paths?sort=count&order={{if and (eq .Sort "count") (eq .Order "desc")}}asc{{else}}desc{{end}}&limit={{.Limit}}&page=1" hx-target="#panel-paths" hx-swap="innerHTML" hx-include="#filter-form">
+                Requests {{if eq .Sort "count"}}{{if eq .Order "asc"}}&#9650;{{else}}&#9660;{{end}}{{end}}
+            </th>
+            <th>%</th>
+            <th class="sort-header" hx-get="/api/panel/paths?sort=bytes&order={{if and (eq .Sort "bytes") (eq .Order "desc")}}asc{{else}}desc{{end}}&limit={{.Limit}}&page=1" hx-target="#panel-paths" hx-swap="innerHTML" hx-include="#filter-form">
+                Bytes {{if eq .Sort "bytes"}}{{if eq .Order "asc"}}&#9650;{{else}}&#9660;{{end}}{{end}}
+            </th>
+            <th class="sort-header" hx-get="/api/panel/paths?sort=avg_ms&order={{if and (eq .Sort "avg_ms") (eq .Order "desc")}}asc{{else}}desc{{end}}&limit={{.Limit}}&page=1" hx-target="#panel-paths" hx-swap="innerHTML" hx-include="#filter-form">
+                Avg Ms {{if eq .Sort "avg_ms"}}{{if eq .Order "asc"}}&#9650;{{else}}&#9660;{{end}}{{end}}
+            </th>
+        </tr>
+    </thead>
+    <tbody>
+        {{range .Paths}}
+        <tr class="drilldown-trigger" hx-get="/api/drilldown/path?path={{.Path}}" hx-target="next .drilldown-row" hx-swap="innerHTML" hx-include="#filter-form">
+            <td>{{.Path}}</td>
+            <td>
+                <span class="pct-bar-wrap">
+                    {{formatNumber .Count}}
+                    {{if $.TotalReqs}}<span class="pct-bar" style="width: {{pct .Count $.TotalReqs}}%;"></span>{{end}}
+                </span>
+            </td>
+            <td>{{formatPct .Pct}}</td>
+            <td>{{formatBytes .Bytes}}</td>
+            <td>{{.AvgMs}} ms</td>
+        </tr>
+        <tr class="drilldown-row" style="display:none;"><td colspan="5"><div class="drilldown"></div></td></tr>
+        {{end}}
+    </tbody>
+    {{if .Summary}}
+    <tfoot>
+        <tr class="summary-row">
+            <td>Total</td>
+            <td>{{formatNumber .Summary.TotalHits}}</td>
+            <td></td>
+            <td>{{formatBytes .Summary.TotalBytes}}</td>
+            <td>{{.Summary.AvgMs}} ms ({{.Summary.MinMs}}-{{.Summary.MaxMs}})</td>
+        </tr>
+    </tfoot>
+    {{end}}
+</table>
+{{if gt .TotalPages 1}}
+<div class="pagination">
+    {{if gt .Page 1}}
+    <button class="filter-btn" hx-get="/api/panel/paths?page={{sub .Page 1}}&limit={{.Limit}}&sort={{.Sort}}&order={{.Order}}" hx-target="#panel-paths" hx-swap="innerHTML" hx-include="#filter-form">Prev</button>
+    {{end}}
+    <span class="text-secondary">Page {{.Page}} of {{.TotalPages}}</span>
+    {{if lt .Page .TotalPages}}
+    <button class="filter-btn" hx-get="/api/panel/paths?page={{add .Page 1}}&limit={{.Limit}}&sort={{.Sort}}&order={{.Order}}" hx-target="#panel-paths" hx-swap="innerHTML" hx-include="#filter-form">Next</button>
+    {{end}}
+</div>
+{{end}}

@@ -1,0 +1,90 @@
+{{define "content"}}
+<!-- Filter Bar -->
+<div class="card" style="margin-bottom: 20px;">
+    <form id="filter-form" hx-get="/api/overview" hx-target="#dashboard-content" hx-trigger="change, every 30s" hx-swap="innerHTML">
+        <input type="hidden" name="range" id="range-input" value="{{.Range}}">
+        <input type="hidden" name="custom_from" id="custom-from-hidden" value="{{.CustomFrom}}">
+        <input type="hidden" name="custom_to" id="custom-to-hidden" value="{{.CustomTo}}">
+
+        <div class="filter-bar">
+            <!-- Date Range buttons -->
+            <div style="display: flex; gap: 5px;">
+                <button type="button" class="filter-btn {{if eq .Range "today"}}active{{end}}" onclick="setRange(this, 'today')">Today</button>
+                <button type="button" class="filter-btn {{if eq .Range "7d"}}active{{end}}" onclick="setRange(this, '7d')">7 Days</button>
+                <button type="button" class="filter-btn {{if eq .Range "30d"}}active{{end}}" onclick="setRange(this, '30d')">30 Days</button>
+                <button type="button" class="filter-btn {{if eq .Range "custom"}}active{{end}}" id="custom-btn" onclick="setRange(this, 'custom')">Custom</button>
+            </div>
+
+            <!-- Custom date inputs (hidden by default) -->
+            <div id="custom-dates" style="display: {{if eq .Range "custom"}}flex{{else}}none{{end}}; gap: 5px; align-items: center;">
+                <input type="date" id="custom-from" value="{{if .CustomFrom}}{{.CustomFrom}}{{else}}{{formatDate -7}}{{end}}" onchange="updateCustomDates()">
+                <span class="text-secondary">to</span>
+                <input type="date" id="custom-to" value="{{if .CustomTo}}{{.CustomTo}}{{else}}{{formatDate 0}}{{end}}" onchange="updateCustomDates()">
+            </div>
+
+            <!-- Router selector -->
+            <select name="router">
+                <option value="">All Services</option>
+                {{range .Routers}}
+                <option value="{{.}}" {{if eq . $.Router}}selected{{end}}>{{.}}</option>
+                {{end}}
+            </select>
+
+            <!-- Bot toggle -->
+            <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                <input type="checkbox" name="bots" value="true" {{if .IncludeBots}}checked{{end}}>
+                Include bots
+            </label>
+        </div>
+    </form>
+</div>
+
+<!-- Dashboard Content (swappable) -->
+<div id="dashboard-content">
+    {{template "overview_partial.html" .}}
+</div>
+
+<script>
+function setRange(btn, val) {
+    document.getElementById('range-input').value = val;
+    document.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+
+    var customDates = document.getElementById('custom-dates');
+    if (val === 'custom') {
+        customDates.style.display = 'flex';
+        updateCustomDates();
+    } else {
+        customDates.style.display = 'none';
+        document.getElementById('custom-from-hidden').value = '';
+        document.getElementById('custom-to-hidden').value = '';
+    }
+    htmx.trigger(document.getElementById('filter-form'), 'change');
+}
+
+function updateCustomDates() {
+    document.getElementById('custom-from-hidden').value = document.getElementById('custom-from').value;
+    document.getElementById('custom-to-hidden').value = document.getElementById('custom-to').value;
+}
+
+// Toggle drilldown rows on click
+document.addEventListener('htmx:afterSwap', function(evt) {
+    var target = evt.detail.target;
+    if (target && target.classList && target.classList.contains('drilldown-row')) {
+        target.style.display = target.style.display === 'none' ? '' : 'table-row';
+    }
+});
+
+document.addEventListener('click', function(evt) {
+    var trigger = evt.target.closest('.drilldown-trigger');
+    if (!trigger) return;
+    var row = trigger.nextElementSibling;
+    if (row && row.classList.contains('drilldown-row')) {
+        if (row.style.display !== 'none' && row.querySelector('.drilldown-content')) {
+            row.style.display = 'none';
+            return;
+        }
+    }
+});
+</script>
+{{end}}

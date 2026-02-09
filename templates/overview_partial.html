@@ -1,0 +1,301 @@
+<!-- Summary Stats Row -->
+{{if .Stats}}
+<div class="card-grid">
+    <div class="stat">
+        <span class="stat-value">{{formatNumber .Stats.Requests}}</span>
+        <span class="stat-label">Total Requests</span>
+    </div>
+    <div class="stat">
+        <span class="stat-value">{{formatNumber .Stats.Visitors}}</span>
+        <span class="stat-label">Unique Visitors</span>
+    </div>
+    <div class="stat">
+        <span class="stat-value">{{formatBytes .Stats.Bytes}}</span>
+        <span class="stat-label">Total Bandwidth</span>
+    </div>
+    <div class="stat">
+        <span class="stat-value">{{.Stats.AvgMs}} ms</span>
+        <span class="stat-label">Avg Response Time</span>
+    </div>
+</div>
+{{end}}
+
+<!-- Requests Over Time (vertical bar chart) -->
+<div class="card">
+    <div class="card-header">Unique Visitors / Requests</div>
+    {{if .RequestsChart}}
+        <div class="timeseries-chart">
+            {{range $i, $point := .RequestsChart}}
+            <div class="timeseries-col">
+                <div class="timeseries-value">{{formatNumber .Count}}</div>
+                <div class="timeseries-bars" style="height: {{pct .Count $.MaxRequests}}%;">
+                    <div class="timeseries-bar-hits" style="height: 100%;"></div>
+                    {{range $.VisitorsChart}}{{if eq .Label $point.Label}}{{if gt .Count 0}}<div class="timeseries-bar-visitors" style="height: {{pct .Count $point.Count}}%;"></div>{{end}}{{end}}{{end}}
+                </div>
+                <div class="timeseries-label">{{formatTimeLabel .Label}}</div>
+            </div>
+            {{end}}
+        </div>
+        <div class="chart-legend">
+            <span class="legend-item"><span class="legend-color" style="background: var(--accent);"></span> Hits</span>
+            <span class="legend-item"><span class="legend-color" style="background: var(--success);"></span> Visitors</span>
+        </div>
+    {{else}}
+        <p class="text-secondary">No data available for the selected period.</p>
+    {{end}}
+</div>
+
+<!-- Two-column grid for panels -->
+<div class="panel-grid">
+
+<!-- Top Paths Table (paginated) -->
+<div class="card" id="panel-paths">
+    <div class="card-header">
+        Top Paths
+        <button class="filter-btn text-small" style="float:right;" hx-get="/api/panel/paths?page=1&limit=10&sort=count&order=desc" hx-target="#panel-paths" hx-swap="innerHTML" hx-include="#filter-form">Paginated View</button>
+    </div>
+    {{if .TopPaths}}
+        <table>
+            <thead>
+                <tr>
+                    <th>Path</th>
+                    <th>Requests</th>
+                    <th>%</th>
+                    <th>Bytes</th>
+                    <th>Avg Ms</th>
+                    <th>Trend</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .TopPaths}}
+                <tr class="drilldown-trigger" hx-get="/api/drilldown/path?path={{.Path}}" hx-target="next .drilldown-row" hx-swap="innerHTML" hx-include="#filter-form">
+                    <td>{{.Path}}</td>
+                    <td>
+                        <span class="pct-bar-wrap">
+                            {{formatNumber .Count}}
+                            {{if $.Stats}}<span class="pct-bar" style="width: {{pct .Count $.Stats.Requests}}%;"></span>{{end}}
+                        </span>
+                    </td>
+                    <td>{{formatPct .Pct}}</td>
+                    <td>{{formatBytes .Bytes}}</td>
+                    <td>{{.AvgMs}} ms</td>
+                    <td>{{sparklineSVG .Trend}}</td>
+                </tr>
+                <tr class="drilldown-row" style="display:none;"><td colspan="6"><div class="drilldown"></div></td></tr>
+                {{end}}
+            </tbody>
+        </table>
+    {{else}}
+        <p class="text-secondary">No paths found for the selected period.</p>
+    {{end}}
+</div>
+
+<!-- Top Referrers -->
+<div class="card" id="panel-referrers">
+    <div class="card-header">Top Referrers</div>
+    {{if .TopReferrers}}
+        <table>
+            <thead>
+                <tr>
+                    <th>Referrer</th>
+                    <th>Requests</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .TopReferrers}}
+                <tr>
+                    <td>{{.Referrer}}</td>
+                    <td>
+                        <span class="pct-bar-wrap">
+                            {{formatNumber .Count}}
+                            <span class="pct-bar" style="width: {{pct .Count $.MaxReferrer}}%;"></span>
+                        </span>
+                    </td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    {{else}}
+        <p class="text-secondary">No referrer data available.</p>
+    {{end}}
+</div>
+
+</div><!-- end panel-grid -->
+
+<!-- Status Code Breakdown (class-level) -->
+<div class="card">
+    <div class="card-header">Status Code Breakdown</div>
+    {{if .StatusCodes}}
+        {{if .StatusDonut}}
+        <div class="donut-container">
+            <div class="donut" style="background: {{conicGradient .StatusDonut}};"></div>
+            <div class="donut-legend">
+                {{range .StatusDonut}}
+                <div class="donut-legend-item">
+                    <div class="donut-legend-color" style="background: {{.Color}};"></div>
+                    <span class="donut-legend-label">{{.Label}}</span>
+                    <span class="donut-legend-value">{{formatNumber .Count}} ({{formatPct .Pct}})</span>
+                </div>
+                {{end}}
+            </div>
+        </div>
+        {{end}}
+        {{range .StatusCodes}}
+        <div class="chart-bar drilldown-trigger" hx-get="/api/drilldown/status?class={{.Class}}" hx-target="#status-drilldown" hx-swap="innerHTML" hx-include="#filter-form">
+            <div class="chart-bar-label">{{.Class}}</div>
+            <div class="chart-bar-wrapper">
+                <div class="chart-bar-fill" style="width: {{pct .Count $.MaxStatus}}%; background: linear-gradient(90deg, {{statusColor .Class}} 0%, {{statusColor .Class}} 100%);"></div>
+            </div>
+            <div class="chart-bar-value">{{formatNumber .Count}}</div>
+        </div>
+        {{end}}
+        <div id="status-drilldown"></div>
+    {{else}}
+        <p class="text-secondary">No status data available.</p>
+    {{end}}
+</div>
+
+<div class="panel-grid">
+
+<!-- Specific HTTP Status Codes -->
+<div class="card">
+    <div class="card-header">HTTP Status Codes</div>
+    {{if .StatusDetails}}
+        {{range .StatusDetails}}
+        <div class="chart-bar drilldown-trigger" hx-get="/api/drilldown/status-code?code={{.Status}}" hx-target="#individual-status-drilldown" hx-swap="innerHTML" hx-include="#filter-form">
+            <div class="chart-bar-label" style="min-width: 50px;">{{.Status}}</div>
+            <div class="chart-bar-wrapper">
+                <div class="chart-bar-fill" style="width: {{pct .Count $.MaxStatusDet}}%; background: {{statusCodeColor .Status}};"></div>
+            </div>
+            <div class="chart-bar-value">{{formatNumber .Count}} <span class="text-secondary text-small">({{formatPct .Pct}})</span></div>
+        </div>
+        {{end}}
+        <div id="individual-status-drilldown"></div>
+    {{else}}
+        <p class="text-secondary">No status code data available.</p>
+    {{end}}
+</div>
+
+<!-- HTTP Method Distribution -->
+<div class="card">
+    <div class="card-header">HTTP Methods</div>
+    {{if .Methods}}
+        {{if .MethodDonut}}
+        <div class="donut-container">
+            <div class="donut" style="background: {{conicGradient .MethodDonut}};"></div>
+            <div class="donut-legend">
+                {{range .MethodDonut}}
+                <div class="donut-legend-item">
+                    <div class="donut-legend-color" style="background: {{.Color}};"></div>
+                    <span class="donut-legend-label">{{.Label}}</span>
+                    <span class="donut-legend-value">{{formatNumber .Count}} ({{formatPct .Pct}})</span>
+                </div>
+                {{end}}
+            </div>
+        </div>
+        {{end}}
+        {{range .Methods}}
+        <div class="chart-bar">
+            <div class="chart-bar-label" style="min-width: 70px;">{{.Method}}</div>
+            <div class="chart-bar-wrapper">
+                <div class="chart-bar-fill" style="width: {{pct .Count $.MaxMethod}}%;"></div>
+            </div>
+            <div class="chart-bar-value">{{formatNumber .Count}} <span class="text-secondary text-small">({{formatPct .Pct}})</span></div>
+        </div>
+        {{end}}
+    {{else}}
+        <p class="text-secondary">No method data available.</p>
+    {{end}}
+</div>
+
+</div><!-- end panel-grid -->
+
+<div class="panel-grid">
+
+<!-- Not Found (404) Paths -->
+<div class="card" id="panel-not-found">
+    <div class="card-header">Not Found (404)</div>
+    {{if .NotFoundPaths}}
+        <table>
+            <thead>
+                <tr>
+                    <th>Path</th>
+                    <th>Hits</th>
+                    <th>Bytes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .NotFoundPaths}}
+                <tr class="drilldown-trigger" hx-get="/api/drilldown/path?path={{.Path}}" hx-target="next .drilldown-row" hx-swap="innerHTML" hx-include="#filter-form">
+                    <td>{{.Path}}</td>
+                    <td>{{formatNumber .Count}}</td>
+                    <td>{{formatBytes .Bytes}}</td>
+                </tr>
+                <tr class="drilldown-row" style="display:none;"><td colspan="3"><div class="drilldown"></div></td></tr>
+                {{end}}
+            </tbody>
+        </table>
+    {{else}}
+        <p class="text-secondary">No 404 paths found.</p>
+    {{end}}
+</div>
+
+<!-- Browsers / User Agents -->
+<div class="card">
+    <div class="card-header">Browsers / User Agents</div>
+    {{if .UserAgents}}
+        {{if .UserAgentDonut}}
+        <div class="donut-container">
+            <div class="donut" style="background: {{conicGradient .UserAgentDonut}};"></div>
+            <div class="donut-legend">
+                {{range .UserAgentDonut}}
+                <div class="donut-legend-item">
+                    <div class="donut-legend-color" style="background: {{.Color}};"></div>
+                    <span class="donut-legend-label">{{.Label}}</span>
+                    <span class="donut-legend-value">{{formatNumber .Count}} ({{formatPct .Pct}})</span>
+                </div>
+                {{end}}
+            </div>
+        </div>
+        {{end}}
+        {{range .UserAgents}}
+        <div class="chart-bar">
+            <div class="chart-bar-label">{{.Category}}</div>
+            <div class="chart-bar-wrapper">
+                <div class="chart-bar-fill" style="width: {{pct .Count $.MaxUserAgent}}%;"></div>
+            </div>
+            <div class="chart-bar-value">{{formatNumber .Count}} <span class="text-secondary text-small">({{formatPct .Pct}})</span></div>
+        </div>
+        {{end}}
+    {{else}}
+        <p class="text-secondary">No user agent data available.</p>
+    {{end}}
+</div>
+
+</div><!-- end panel-grid -->
+
+<!-- Time Distribution (Hour of Day) -->
+<div class="card">
+    <div class="card-header">Time Distribution (Hour of Day)</div>
+    {{if .HourOfDay}}
+        <div class="hour-chart">
+            {{$hourData := .HourOfDay}}{{$hourVisitors := .HourVisitors}}{{$maxHour := .MaxHourOfDay}}
+            {{range $i, $h := $hourData}}
+            <div class="hour-bar">
+                <div class="hour-bar-fills" style="height: {{pct $h.Count $maxHour}}%;">
+                    <div class="hour-bar-fill" style="height: 100%;"></div>
+                    {{range $hourVisitors}}{{if eq .Hour $h.Hour}}{{if gt .Count 0}}<div class="hour-bar-fill-visitors" style="height: {{pct .Count $h.Count}}%;"></div>{{end}}{{end}}{{end}}
+                </div>
+                <div class="hour-bar-label">{{$h.Hour}}</div>
+                <div class="hour-bar-value">{{formatNumber $h.Count}}</div>
+            </div>
+            {{end}}
+        </div>
+        <div class="chart-legend">
+            <span class="legend-item"><span class="legend-color" style="background: var(--accent);"></span> Requests</span>
+            <span class="legend-item"><span class="legend-color" style="background: var(--success);"></span> Visitors</span>
+        </div>
+    {{else}}
+        <p class="text-secondary">No hourly data available.</p>
+    {{end}}
+</div>

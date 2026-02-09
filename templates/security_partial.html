@@ -1,0 +1,161 @@
+<!-- Summary Stats Row -->
+<div class="card-grid">
+    <div class="stat">
+        <span class="stat-value">{{formatNumber .TotalUnrouted}}</span>
+        <span class="stat-label">Unrouted Requests</span>
+    </div>
+    <div class="stat">
+        <span class="stat-value">{{formatPct .BotPct}}</span>
+        <span class="stat-label">Bot Traffic</span>
+    </div>
+    <div class="stat">
+        <span class="stat-value">{{formatNumber .Total5xx}}</span>
+        <span class="stat-label">5xx Errors</span>
+    </div>
+    <div class="stat">
+        <span class="stat-value">{{if .SlowestAvgMs}}{{.SlowestAvgMs}} ms{{else}}-{{end}}</span>
+        <span class="stat-label">Slowest Avg</span>
+    </div>
+</div>
+
+<div class="panel-grid">
+
+<!-- Threat Pattern Breakdown -->
+<div class="card">
+    <div class="card-header">Threat Pattern Classification</div>
+    {{if .ThreatPatterns}}
+        {{range .ThreatPatterns}}
+        <div class="chart-bar">
+            <div class="chart-bar-label">{{.Category}}</div>
+            <div class="chart-bar-wrapper">
+                <div class="chart-bar-fill" style="width: {{pct .Count $.MaxThreat}}%; background: var(--error);"></div>
+            </div>
+            <div class="chart-bar-value">{{formatNumber .Count}} <span class="text-secondary text-small">({{formatPct .Pct}})</span></div>
+        </div>
+        <div class="text-secondary text-small" style="margin: -6px 0 10px 130px;">
+            {{range .Examples}}{{.}} {{end}}
+        </div>
+        {{end}}
+    {{else}}
+        <p class="text-secondary">No unrouted traffic in this period.</p>
+    {{end}}
+</div>
+
+<!-- Bot vs Human -->
+<div class="card">
+    <div class="card-header">Bot vs Human Traffic</div>
+    {{if .TotalTraffic}}
+        <div class="bot-human-bar">
+            {{if .HumanCount}}
+            <div class="bot-human-segment bot-human-human" style="width: {{pct .HumanCount .TotalTraffic}}%;">
+                {{formatPct .HumanPct}}
+            </div>
+            {{end}}
+            {{if .BotCount}}
+            <div class="bot-human-segment bot-human-bot" style="width: {{pct .BotCount .TotalTraffic}}%;">
+                {{formatPct .BotPct}}
+            </div>
+            {{end}}
+        </div>
+        <div class="chart-legend" style="margin-top: 10px;">
+            <span class="legend-item"><span class="legend-color" style="background: var(--success);"></span> Human ({{formatNumber .HumanCount}})</span>
+            <span class="legend-item"><span class="legend-color" style="background: var(--warning);"></span> Bot ({{formatNumber .BotCount}})</span>
+        </div>
+        {{if .BotBreakdown}}
+        <div style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 10px;">
+            <div class="text-secondary text-small" style="margin-bottom: 8px;">Bot breakdown:</div>
+            {{range .BotBreakdown}}
+            <div class="chart-bar">
+                <div class="chart-bar-label">{{.Category}}</div>
+                <div class="chart-bar-wrapper">
+                    <div class="chart-bar-fill" style="width: {{pct .Count $.BotCount}}%; background: var(--warning);"></div>
+                </div>
+                <div class="chart-bar-value">{{formatNumber .Count}}</div>
+            </div>
+            {{end}}
+        </div>
+        {{end}}
+    {{else}}
+        <p class="text-secondary">No traffic data available.</p>
+    {{end}}
+</div>
+
+</div><!-- end panel-grid -->
+
+<!-- 5xx Error Trends -->
+<div class="card">
+    <div class="card-header">5xx Error Trends</div>
+    {{if .ErrorTrends}}
+        <div class="timeseries-chart">
+            {{range .ErrorTrends}}
+            <div class="timeseries-row">
+                <div class="timeseries-label">{{formatTimeLabel .Label}}</div>
+                <div class="timeseries-bars">
+                    <div class="timeseries-bar-hits" style="width: {{pct .Count $.MaxErrorCount}}%; background: var(--error); opacity: 0.8;"></div>
+                </div>
+                <div class="timeseries-value" style="color: var(--error);">{{formatNumber .Count}}</div>
+            </div>
+            {{end}}
+        </div>
+    {{else}}
+        <p class="text-secondary">No 5xx errors in this period.</p>
+    {{end}}
+</div>
+
+<div class="panel-grid">
+
+<!-- Top Error Paths -->
+<div class="card">
+    <div class="card-header">Top Error Paths (5xx)</div>
+    {{if .ErrorPaths}}
+        <table>
+            <thead>
+                <tr>
+                    <th>Path</th>
+                    <th>5xx Count</th>
+                    <th>Avg Ms</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .ErrorPaths}}
+                <tr>
+                    <td>{{.Path}}</td>
+                    <td style="color: var(--error);">{{formatNumber .Count}}</td>
+                    <td>{{.AvgMs}} ms</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    {{else}}
+        <p class="text-secondary">No 5xx errors found.</p>
+    {{end}}
+</div>
+
+<!-- Slowest Paths -->
+<div class="card">
+    <div class="card-header">Slowest Paths</div>
+    {{if .SlowestPaths}}
+        <table>
+            <thead>
+                <tr>
+                    <th>Path</th>
+                    <th>Avg Ms</th>
+                    <th>Requests</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .SlowestPaths}}
+                <tr>
+                    <td>{{.Path}}</td>
+                    <td style="color: var(--warning);">{{.AvgMs}} ms</td>
+                    <td>{{formatNumber .Count}}</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    {{else}}
+        <p class="text-secondary">No path data available.</p>
+    {{end}}
+</div>
+
+</div><!-- end panel-grid -->

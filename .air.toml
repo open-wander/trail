@@ -1,0 +1,16 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "go build -o ./tmp/trail ./cmd/trail"
+  bin = "./tmp/trail"
+  full_bin = "TRAIL_LOG_FILE=./logs/access.log TRAIL_DB_PATH=./tmp/trail.db TRAIL_LISTEN=:8080 ./tmp/trail"
+  include_ext = ["go", "html", "css"]
+  exclude_dir = ["tmp", "vendor", ".git", ".loop"]
+  delay = 1000
+
+[log]
+  time = false
+
+[misc]
+  clean_on_exit = true

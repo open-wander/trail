@@ -1,0 +1,26 @@
+<div class="card-header">Top Referrers</div>
+{{if .Referrers}}
+    <table>
+        <thead>
+            <tr>
+                <th>Referrer</th>
+                <th>Requests</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .Referrers}}
+            <tr>
+                <td>{{.Referrer}}</td>
+                <td>
+                    <span class="pct-bar-wrap">
+                        {{formatNumber .Count}}
+                        <span class="pct-bar" style="width: {{pct .Count $.MaxReferrer}}%;"></span>
+                    </span>
+                </td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+{{else}}
+    <p class="text-secondary">No referrer data available.</p>
+{{end}}

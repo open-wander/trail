@@ -1,0 +1,53 @@
+{{define "content"}}
+<!-- Filter Bar -->
+<div class="card" style="margin-bottom: 20px;">
+    <form id="security-filter-form" hx-get="/api/security" hx-target="#security-content" hx-trigger="change" hx-swap="innerHTML">
+        <input type="hidden" name="range" id="sec-range-input" value="{{.Range}}">
+        <input type="hidden" name="custom_from" id="sec-custom-from-hidden" value="{{.CustomFrom}}">
+        <input type="hidden" name="custom_to" id="sec-custom-to-hidden" value="{{.CustomTo}}">
+
+        <div class="filter-bar">
+            <div style="display: flex; gap: 5px;">
+                <button type="button" class="filter-btn {{if eq .Range "today"}}active{{end}}" onclick="setSecRange(this, 'today')">Today</button>
+                <button type="button" class="filter-btn {{if eq .Range "7d"}}active{{end}}" onclick="setSecRange(this, '7d')">7 Days</button>
+                <button type="button" class="filter-btn {{if eq .Range "30d"}}active{{end}}" onclick="setSecRange(this, '30d')">30 Days</button>
+                <button type="button" class="filter-btn {{if eq .Range "custom"}}active{{end}}" onclick="setSecRange(this, 'custom')">Custom</button>
+            </div>
+
+            <div id="sec-custom-dates" style="display: {{if eq .Range "custom"}}flex{{else}}none{{end}}; gap: 5px; align-items: center;">
+                <input type="date" id="sec-custom-from" value="{{if .CustomFrom}}{{.CustomFrom}}{{else}}{{formatDate -7}}{{end}}" onchange="updateSecCustomDates()">
+                <span class="text-secondary">to</span>
+                <input type="date" id="sec-custom-to" value="{{if .CustomTo}}{{.CustomTo}}{{else}}{{formatDate 0}}{{end}}" onchange="updateSecCustomDates()">
+            </div>
+        </div>
+    </form>
+</div>
+
+<div id="security-content">
+    {{template "security_partial.html" .}}
+</div>
+
+<script>
+function setSecRange(btn, val) {
+    document.getElementById('sec-range-input').value = val;
+    document.querySelectorAll('#security-filter-form .filter-btn').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+
+    var customDates = document.getElementById('sec-custom-dates');
+    if (val === 'custom') {
+        customDates.style.display = 'flex';
+        updateSecCustomDates();
+    } else {
+        customDates.style.display = 'none';
+        document.getElementById('sec-custom-from-hidden').value = '';
+        document.getElementById('sec-custom-to-hidden').value = '';
+    }
+    htmx.trigger(document.getElementById('security-filter-form'), 'change');
+}
+
+function updateSecCustomDates() {
+    document.getElementById('sec-custom-from-hidden').value = document.getElementById('sec-custom-from').value;
+    document.getElementById('sec-custom-to-hidden').value = document.getElementById('sec-custom-to').value;
+}
+</script>
+{{end}}

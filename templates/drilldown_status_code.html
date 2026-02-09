@@ -1,0 +1,48 @@
+<div class="drilldown-content">
+    <div class="drilldown-header">Status {{.Code}} - Top Paths</div>
+    {{if .Paths}}
+        <table>
+            <thead>
+                <tr>
+                    <th>Path</th>
+                    <th>Requests</th>
+                    <th>Bytes</th>
+                    <th>Avg Ms</th>
+                    <th>Also Returns</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .Paths}}
+                <tr>
+                    <td>{{.Path}}</td>
+                    <td>{{formatNumber .Count}}</td>
+                    <td>{{formatBytes .Bytes}}</td>
+                    <td>{{.AvgMs}} ms</td>
+                    <td>
+                        {{range .AltStatuses}}
+                        <span class="method-badge" style="color: {{statusCodeColor .Status}}; border-color: {{statusCodeColor .Status}};">{{.Status}} ({{formatNumber .Count}})</span>
+                        {{end}}
+                    </td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    {{else}}
+        <p class="text-secondary">No paths found for this status code.</p>
+    {{end}}
+
+    {{if .Methods}}
+    <div style="margin-top: 16px;">
+        <div class="drilldown-header">Method Breakdown</div>
+        {{range .Methods}}
+        <div class="chart-bar">
+            <div class="chart-bar-label" style="min-width: 70px;">{{.Method}}</div>
+            <div class="chart-bar-wrapper">
+                <div class="chart-bar-fill" style="width: {{pct .Count $.MaxMethod}}%;"></div>
+            </div>
+            <div class="chart-bar-value">{{formatNumber .Count}} <span class="text-secondary text-small">({{formatPct .Pct}})</span></div>
+        </div>
+        {{end}}
+    </div>
+    {{end}}
+</div>

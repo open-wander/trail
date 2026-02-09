@@ -1,0 +1,29 @@
+services:
+  trail:
+    build: .
+    image: ghcr.io/open-wander/trail:latest
+    container_name: trail
+    restart: unless-stopped
+    environment:
+      TRAIL_LOG_FILE: /logs/access.log
+      TRAIL_DB_PATH: /data/trail.db
+      TRAIL_RETENTION_DAYS: "90"
+      TRAIL_HTPASSWD_FILE: /etc/trail/.htpasswd
+    volumes:
+      - /path/to/traefik/logs:/logs:ro
+      - /path/to/trail/data:/data
+      - /path/to/htpasswd:/etc/trail/.htpasswd:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik_web"
+      - "traefik.http.routers.trail.rule=Host(`stats.example.com`)"
+      - "traefik.http.routers.trail.entrypoints=websecure"
+      - "traefik.http.routers.trail.tls.certresolver=letsencrypt"
+      - "traefik.http.services.trail.loadbalancer.server.port=8080"
+    networks:
+      - web
+
+networks:
+  web:
+    external: true
+    name: traefik_web
