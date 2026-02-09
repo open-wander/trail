@@ -31,7 +31,7 @@
         <span class="stat-label">p99 Latency</span>
     </div>
     {{end}}
-    {{if or (gt .MobilePct 0) (gt .DesktopPct 0)}}
+    {{if or (gt .MobilePct 0.0) (gt .DesktopPct 0.0)}}
     <div class="stat">
         <span class="stat-value">{{formatPct .MobilePct}}</span>
         <span class="stat-label">Mobile</span>
