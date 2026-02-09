@@ -146,21 +146,7 @@
 <div class="card">
     <div class="card-header">Status Code Breakdown</div>
     {{if .StatusCodes}}
-        {{if .StatusDonut}}
-        <div class="donut-container">
-            <div class="donut" style="background: {{conicGradient .StatusDonut}};"></div>
-            <div class="donut-legend">
-                {{range .StatusDonut}}
-                <div class="donut-legend-item">
-                    <div class="donut-legend-color" style="background: {{.Color}};"></div>
-                    <span class="donut-legend-label">{{.Label}}</span>
-                    <span class="donut-legend-value">{{formatNumber .Count}} ({{formatPct .Pct}})</span>
-                </div>
-                {{end}}
-            </div>
-        </div>
-        {{end}}
-        {{range .StatusCodes}}
+            {{range .StatusCodes}}
         <div class="chart-bar drilldown-trigger" hx-get="/api/drilldown/status?class={{.Class}}" hx-target="#status-drilldown" hx-swap="innerHTML" hx-include="#filter-form">
             <div class="chart-bar-label">{{.Class}}</div>
             <div class="chart-bar-wrapper">
@@ -200,20 +186,6 @@
 <div class="card">
     <div class="card-header">HTTP Methods</div>
     {{if .Methods}}
-        {{if .MethodDonut}}
-        <div class="donut-container">
-            <div class="donut" style="background: {{conicGradient .MethodDonut}};"></div>
-            <div class="donut-legend">
-                {{range .MethodDonut}}
-                <div class="donut-legend-item">
-                    <div class="donut-legend-color" style="background: {{.Color}};"></div>
-                    <span class="donut-legend-label">{{.Label}}</span>
-                    <span class="donut-legend-value">{{formatNumber .Count}} ({{formatPct .Pct}})</span>
-                </div>
-                {{end}}
-            </div>
-        </div>
-        {{end}}
         {{range .Methods}}
         <div class="chart-bar">
             <div class="chart-bar-label" style="min-width: 70px;">{{.Method}}</div>
@@ -264,20 +236,6 @@
 <div class="card">
     <div class="card-header">Browsers / User Agents</div>
     {{if .UserAgents}}
-        {{if .UserAgentDonut}}
-        <div class="donut-container">
-            <div class="donut" style="background: {{conicGradient .UserAgentDonut}};"></div>
-            <div class="donut-legend">
-                {{range .UserAgentDonut}}
-                <div class="donut-legend-item">
-                    <div class="donut-legend-color" style="background: {{.Color}};"></div>
-                    <span class="donut-legend-label">{{.Label}}</span>
-                    <span class="donut-legend-value">{{formatNumber .Count}} ({{formatPct .Pct}})</span>
-                </div>
-                {{end}}
-            </div>
-        </div>
-        {{end}}
         {{range .UserAgents}}
         <div class="chart-bar">
             <div class="chart-bar-label">{{.Category}}</div>
@@ -301,20 +259,6 @@
 <div class="card">
     <div class="card-header">Browser Distribution</div>
     {{if .Browsers}}
-        {{if .BrowserDonut}}
-        <div class="donut-container">
-            <div class="donut" style="background: {{conicGradient .BrowserDonut}};"></div>
-            <div class="donut-legend">
-                {{range .BrowserDonut}}
-                <div class="donut-legend-item">
-                    <div class="donut-legend-color" style="background: {{.Color}};"></div>
-                    <span class="donut-legend-label">{{.Label}}</span>
-                    <span class="donut-legend-value">{{formatNumber .Count}} ({{formatPct .Pct}})</span>
-                </div>
-                {{end}}
-            </div>
-        </div>
-        {{end}}
         {{range .Browsers}}
         <div class="chart-bar">
             <div class="chart-bar-label">{{.Browser}}</div>
@@ -333,20 +277,6 @@
 <div class="card">
     <div class="card-header">Operating Systems</div>
     {{if .OSStats}}
-        {{if .OSDonut}}
-        <div class="donut-container">
-            <div class="donut" style="background: {{conicGradient .OSDonut}};"></div>
-            <div class="donut-legend">
-                {{range .OSDonut}}
-                <div class="donut-legend-item">
-                    <div class="donut-legend-color" style="background: {{.Color}};"></div>
-                    <span class="donut-legend-label">{{.Label}}</span>
-                    <span class="donut-legend-value">{{formatNumber .Count}} ({{formatPct .Pct}})</span>
-                </div>
-                {{end}}
-            </div>
-        </div>
-        {{end}}
         {{range .OSStats}}
         <div class="chart-bar">
             <div class="chart-bar-label">{{.OS}}</div>
