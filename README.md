@@ -8,6 +8,11 @@ Self-hosted web analytics for Traefik and Apache/Nginx. No JavaScript tracking. 
 - Hourly aggregation into SQLite (no external database needed)
 - Dark theme dashboard with interactive charts
 - Status code drilldowns, path trends, visitor overlays
+- Browser and OS breakdown with donut charts
+- GeoIP country reports (optional, via DB-IP or MaxMind mmdb)
+- Response time histogram with p50/p95/p99 percentiles
+- Bandwidth and response time trends over time
+- Mobile vs desktop traffic split
 - Bot detection and security threat analysis
 - Supports Traefik, Apache, and Nginx log formats with auto-detection
 - Basic auth via htpasswd or environment variables
@@ -60,6 +65,7 @@ All configuration is via environment variables:
 | `TRAIL_HTPASSWD_FILE` | | Path to htpasswd file (bcrypt only) |
 | `TRAIL_AUTH_USER` | | Basic auth username |
 | `TRAIL_AUTH_PASS` | | Basic auth password |
+| `TRAIL_GEOIP_PATH` | | Path to GeoIP mmdb file (optional, enables country panel) |
 
 Authentication priority: htpasswd file > env var credentials > no auth.
 
@@ -68,6 +74,16 @@ Authentication priority: htpasswd file > env var credentials > no auth.
 - **`auto`** (default): Reads the first 10 lines and auto-detects the format
 - **`traefik`**: Traefik extended Common Log Format
 - **`combined`**: Apache/Nginx Combined Log Format (with optional trailing response time)
+
+### GeoIP (optional)
+
+To enable country reports, download a free [DB-IP Lite](https://db-ip.com/db/download/ip-to-country-lite) or MaxMind GeoLite2 Country mmdb file and set `TRAIL_GEOIP_PATH`:
+
+```bash
+TRAIL_GEOIP_PATH=/path/to/dbip-country-lite.mmdb ./trail
+```
+
+If the file is missing or unreadable, Trail logs a warning and runs without country data. The country panel only appears when GeoIP is enabled.
 
 ## Deployment
 
@@ -165,12 +181,18 @@ docker run -d --name trail \
 
 ### Overview (/)
 
-- Summary stats: requests, visitors, bandwidth, avg response time
+- Summary stats: requests, visitors, bandwidth, avg response time, p50/p95/p99 latency, mobile/desktop split
 - Requests/visitors over time (vertical bar chart with overlay)
 - Top paths with sparkline trends
 - Top referrers with percentage bars
 - Status code breakdown (donut + horizontal bars with drilldown)
 - HTTP methods and user agents (donut + bars)
+- Browser distribution (donut + bars)
+- OS distribution (donut + bars)
+- GeoIP country breakdown (top 20, requires mmdb file)
+- Response time histogram (6 buckets from 0-10ms to 1000+ms)
+- Bandwidth over time
+- Response time trend over time
 - 404 paths (clickable drilldown)
 - Hour-of-day distribution (requests + visitors overlay)
 
@@ -214,6 +236,8 @@ Access log --> Tailer (1s poll) --> Parser --> Aggregator --> SQLite
 - **Parser**: Regex-based, supports Traefik and Apache/Nginx Combined formats
 - **Aggregator**: Batches entries, flushes hourly aggregates every 10s or 1000 lines
 - **Bot detector**: Classifies traffic by User-Agent patterns and router field
+- **UA classifier**: Extracts browser and OS from User-Agent strings
+- **GeoIP**: Optional country lookup via DB-IP or MaxMind mmdb files
 - **Retention**: Periodic cleanup of data older than configured retention period
 
 ## Tech Stack
