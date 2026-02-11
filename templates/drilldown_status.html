@@ -2,12 +2,12 @@
     <div class="drilldown-header">{{.Class}} Status Codes</div>
     {{if .Statuses}}
         {{range .Statuses}}
-        <div class="chart-bar drilldown-trigger" hx-get="/api/drilldown/status-code?code={{.Status}}" hx-target="#status-code-drilldown" hx-swap="innerHTML" hx-include="#filter-form">
-            <div class="chart-bar-label" style="min-width: 50px;">{{.Status}}</div>
-            <div class="chart-bar-wrapper">
-                <div class="chart-bar-fill" style="width: {{pct .Count $.Max}}%; background: {{statusCodeColor .Status}};"></div>
+        <div class="chart-row drilldown-trigger" hx-get="/api/drilldown/status-code?code={{.Status}}" hx-target="#status-code-drilldown" hx-swap="innerHTML" hx-include="#filter-form">
+            <span class="chart-row-label" style="min-width: 50px;">{{.Status}}</span>
+            <div class="chart-row-track">
+                <div class="chart-row-fill" style="width: {{pct .Count $.Max}}%; background: {{statusCodeColor .Status}};"></div>
             </div>
-            <div class="chart-bar-value">{{formatNumber .Count}} <span class="text-secondary text-small">({{formatPct .Pct}})</span></div>
+            <span class="chart-row-value">{{formatNumber .Count}} <span class="text-secondary" style="font-size: 0.85em;">({{formatPct .Pct}})</span></span>
         </div>
         {{end}}
         <div id="status-code-drilldown"></div>
