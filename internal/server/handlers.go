@@ -119,6 +119,7 @@ type SecurityData struct {
 	CustomFrom     string
 	CustomTo       string
 	Page           string
+	ActiveTab      string
 }
 
 // handleOverview serves the main dashboard overview page
@@ -1021,7 +1022,14 @@ func (s *Server) buildFilterWithCustom(c *fiber.Ctx, router string, includeBots 
 	return s.buildFilter(rangeParam, router, includeBots), rangeParam
 }
 
-// handleAPISecurity serves the htmx partial for security data
+// validSecurityTabs is the set of valid tab names for the security page
+var validSecurityTabs = map[string]bool{
+	"summary":     true,
+	"errors":      true,
+	"performance": true,
+}
+
+// handleAPISecurityPartial serves the htmx partial for security data
 func (s *Server) handleAPISecurityPartial(c *fiber.Ctx) error {
 	data, err := s.getSecurityData(c)
 	if err != nil {
@@ -1029,9 +1037,11 @@ func (s *Server) handleAPISecurityPartial(c *fiber.Ctx) error {
 		return c.Status(500).SendString("Error loading security data")
 	}
 
+	tmplName := "security_tab_" + data.ActiveTab + ".html"
+
 	var buf bytes.Buffer
-	if err := s.tmpl.ExecuteTemplate(&buf, "security_partial.html", data); err != nil {
-		log.Printf("Error rendering security partial: %v", err)
+	if err := s.tmpl.ExecuteTemplate(&buf, tmplName, data); err != nil {
+		log.Printf("Error rendering security tab template %s: %v", tmplName, err)
 		return c.Status(500).SendString("Error rendering partial")
 	}
 
@@ -1041,6 +1051,12 @@ func (s *Server) handleAPISecurityPartial(c *fiber.Ctx) error {
 
 // getSecurityData fetches and prepares data for the security page
 func (s *Server) getSecurityData(c *fiber.Ctx) (*SecurityData, error) {
+	// Parse active tab
+	activeTab := c.Query("tab", "summary")
+	if !validSecurityTabs[activeTab] {
+		activeTab = "summary"
+	}
+
 	// Build filter with IncludeBots=true (security view shows all traffic)
 	filter, rangeParam := s.buildFilterWithCustom(c, "", true)
 	if rangeParam == "today" {
@@ -1143,5 +1159,6 @@ func (s *Server) getSecurityData(c *fiber.Ctx) (*SecurityData, error) {
 		CustomFrom:     customFrom,
 		CustomTo:       customTo,
 		Page:           "security",
+		ActiveTab:      activeTab,
 	}, nil
 }

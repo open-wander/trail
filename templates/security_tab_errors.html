@@ -1,0 +1,47 @@
+<!-- 5xx Error Trends -->
+<div class="card">
+    <div class="card-header">5xx Error Trends</div>
+    {{if .ErrorTrends}}
+        <div class="timeseries-chart">
+            {{range .ErrorTrends}}
+            <div class="timeseries-col">
+                <div class="timeseries-bars">
+                    <div class="timeseries-bar-hits" style="height: {{pct .Count $.MaxErrorCount}}%; background: var(--error); opacity: 0.8;"></div>
+                </div>
+                <div class="timeseries-label">{{formatTimeLabel .Label}}</div>
+            </div>
+            {{end}}
+        </div>
+    {{else}}
+        <p class="text-secondary">No 5xx errors in this period.</p>
+    {{end}}
+</div>
+
+<!-- Top Error Paths -->
+<div class="card">
+    <div class="card-header">Top Error Paths (5xx)</div>
+    {{if .ErrorPaths}}
+        <div class="overflow-x-auto">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Path</th>
+                        <th>5xx Count</th>
+                        <th>Avg Ms</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .ErrorPaths}}
+                    <tr>
+                        <td><code>{{.Path}}</code></td>
+                        <td style="color: var(--error);">{{formatNumber .Count}}</td>
+                        <td>{{.AvgMs}} ms</td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+    {{else}}
+        <p class="text-secondary">No 5xx errors found.</p>
+    {{end}}
+</div>

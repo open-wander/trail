@@ -77,11 +77,13 @@ func New(cfg *config.Config, database *sql.DB, templatesFS, staticFS fs.FS) *Ser
 		"overview_tab_performance.html",
 	))
 
-	// Parse security templates (layout + security + partial)
+	// Parse security templates (layout + security + tab partials)
 	securityTmpl := template.Must(template.New("").Funcs(funcMap).ParseFS(tmplFS,
 		"layout.html",
 		"security.html",
-		"security_partial.html",
+		"security_tab_summary.html",
+		"security_tab_errors.html",
+		"security_tab_performance.html",
 	))
 
 	// Parse all templates for backward compatibility with partials

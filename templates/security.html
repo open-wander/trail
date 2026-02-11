@@ -1,8 +1,9 @@
 {{define "content"}}
 <!-- Filter Bar -->
-<div class="card" style="margin-bottom: 20px;">
-    <form id="security-filter-form" hx-get="/api/security" hx-target="#security-content" hx-trigger="change" hx-swap="innerHTML">
+<div class="card" style="margin-bottom: 1rem;">
+    <form id="security-filter-form" hx-get="/api/security" hx-target="#sec-tab-content" hx-trigger="change" hx-swap="innerHTML">
         <input type="hidden" name="range" id="sec-range-input" value="{{.Range}}">
+        <input type="hidden" name="tab" id="sec-tab-input" value="{{.ActiveTab}}">
         <input type="hidden" name="custom_from" id="sec-custom-from-hidden" value="{{.CustomFrom}}">
         <input type="hidden" name="custom_to" id="sec-custom-to-hidden" value="{{.CustomTo}}">
 
@@ -23,11 +24,26 @@
     </form>
 </div>
 
-<div id="security-content">
-    {{template "security_partial.html" .}}
+<!-- Tab Bar -->
+<div class="tab-list" style="margin-bottom: 1rem;">
+    <button class="tab {{if eq .ActiveTab "summary"}}tab-active{{end}}" onclick="switchSecTab(this, 'summary')">Summary</button>
+    <button class="tab {{if eq .ActiveTab "errors"}}tab-active{{end}}" onclick="switchSecTab(this, 'errors')">Errors</button>
+    <button class="tab {{if eq .ActiveTab "performance"}}tab-active{{end}}" onclick="switchSecTab(this, 'performance')">Performance</button>
+</div>
+
+<!-- Tab Content (swappable via htmx) -->
+<div id="sec-tab-content">
+    {{template "security_tab_summary.html" .}}
 </div>
 
 <script>
+function switchSecTab(btn, tab) {
+    document.getElementById('sec-tab-input').value = tab;
+    document.querySelectorAll('.tab-list .tab').forEach(function(t) { t.classList.remove('tab-active'); });
+    btn.classList.add('tab-active');
+    htmx.ajax('GET', '/api/security?' + new URLSearchParams(new FormData(document.getElementById('security-filter-form'))).toString(), {target: '#sec-tab-content', swap: 'innerHTML'});
+}
+
 function setSecRange(btn, val) {
     document.getElementById('sec-range-input').value = val;
     document.querySelectorAll('#security-filter-form .filter-btn').forEach(function(b) { b.classList.remove('active'); });
@@ -42,7 +58,7 @@ function setSecRange(btn, val) {
         document.getElementById('sec-custom-from-hidden').value = '';
         document.getElementById('sec-custom-to-hidden').value = '';
     }
-    htmx.trigger(document.getElementById('security-filter-form'), 'change');
+    htmx.ajax('GET', '/api/security?' + new URLSearchParams(new FormData(document.getElementById('security-filter-form'))).toString(), {target: '#sec-tab-content', swap: 'innerHTML'});
 }
 
 function updateSecCustomDates() {

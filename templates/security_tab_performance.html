@@ -1,0 +1,28 @@
+<!-- Slowest Paths -->
+<div class="card">
+    <div class="card-header">Slowest Paths</div>
+    {{if .SlowestPaths}}
+        <div class="overflow-x-auto">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Path</th>
+                        <th>Avg Response Time</th>
+                        <th>Requests</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .SlowestPaths}}
+                    <tr>
+                        <td><code>{{.Path}}</code></td>
+                        <td style="color: var(--warning);">{{.AvgMs}} ms</td>
+                        <td>{{formatNumber .Count}}</td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+    {{else}}
+        <p class="text-secondary">No path data available.</p>
+    {{end}}
+</div>
