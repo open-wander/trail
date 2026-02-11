@@ -24,11 +24,11 @@
     {{if .ThreatPatterns}}
         {{range .ThreatPatterns}}
         <div class="chart-row">
-            <span class="chart-label">{{.Category}}</span>
-            <div class="chart-bar-track">
-                <div class="chart-bar-fill" style="width: {{pct .Count $.MaxThreat}}%; background: var(--error);"></div>
+            <span class="chart-row-label">{{.Category}}</span>
+            <div class="chart-row-track">
+                <div class="chart-row-fill" style="width: {{pct .Count $.MaxThreat}}%; background: var(--error);"></div>
             </div>
-            <span class="chart-value">{{formatNumber .Count}} <span class="text-secondary" style="font-size: 0.85em;">({{formatPct .Pct}})</span></span>
+            <span class="chart-row-value">{{formatNumber .Count}} <span class="text-secondary" style="font-size: 0.85em;">({{formatPct .Pct}})</span></span>
         </div>
         <div class="text-secondary" style="font-size: 0.85em; margin: -4px 0 8px 130px;">
             {{range .Examples}}{{.}} {{end}}
@@ -64,11 +64,11 @@
             <div class="text-secondary" style="font-size: 0.85em; margin-bottom: 8px;">Bot breakdown:</div>
             {{range .BotBreakdown}}
             <div class="chart-row">
-                <span class="chart-label">{{.Category}}</span>
-                <div class="chart-bar-track">
-                    <div class="chart-bar-fill" style="width: {{pct .Count $.BotCount}}%; background: var(--warning);"></div>
+                <span class="chart-row-label">{{.Category}}</span>
+                <div class="chart-row-track">
+                    <div class="chart-row-fill" style="width: {{pct .Count $.BotCount}}%; background: var(--warning);"></div>
                 </div>
-                <span class="chart-value">{{formatNumber .Count}}</span>
+                <span class="chart-row-value">{{formatNumber .Count}}</span>
             </div>
             {{end}}
         </div>
