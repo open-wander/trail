@@ -95,6 +95,7 @@ type OverviewData struct {
 	MaxDurationHist   int64
 	MaxBandwidth      int64
 	MaxResponseTime   int64
+	ActiveTab         string
 }
 
 // SecurityData represents the data for the security template
@@ -156,6 +157,15 @@ func (s *Server) handleSecurity(c *fiber.Ctx) error {
 	return c.Send(buf.Bytes())
 }
 
+// validOverviewTabs is the set of valid tab names for the overview page
+var validOverviewTabs = map[string]bool{
+	"summary":     true,
+	"traffic":     true,
+	"status":      true,
+	"devices":     true,
+	"performance": true,
+}
+
 // handleAPIOverview serves the htmx partial for overview data
 func (s *Server) handleAPIOverview(c *fiber.Ctx) error {
 	data, err := s.getOverviewData(c)
@@ -164,9 +174,11 @@ func (s *Server) handleAPIOverview(c *fiber.Ctx) error {
 		return c.Status(500).SendString("Error loading dashboard data")
 	}
 
+	tmplName := "overview_tab_" + data.ActiveTab + ".html"
+
 	var buf bytes.Buffer
-	if err := s.tmpl.ExecuteTemplate(&buf, "overview_partial.html", data); err != nil {
-		log.Printf("Error rendering partial template: %v", err)
+	if err := s.tmpl.ExecuteTemplate(&buf, tmplName, data); err != nil {
+		log.Printf("Error rendering tab template %s: %v", tmplName, err)
 		return c.Status(500).SendString("Error rendering partial")
 	}
 
@@ -189,6 +201,10 @@ func (s *Server) getOverviewData(c *fiber.Ctx) (*OverviewData, error) {
 	// Parse query parameters
 	router := c.Query("router", "")
 	includeBots := c.Query("bots", "false") == "true"
+	activeTab := c.Query("tab", "summary")
+	if !validOverviewTabs[activeTab] {
+		activeTab = "summary"
+	}
 
 	// Calculate time filter based on range (supports custom dates)
 	filter, rangeParam := s.buildFilterWithCustom(c, router, includeBots)
@@ -593,6 +609,7 @@ func (s *Server) getOverviewData(c *fiber.Ctx) (*OverviewData, error) {
 		IncludeBots:     includeBots,
 		Routers:         routers,
 		Page:            "overview",
+		ActiveTab:       activeTab,
 		StatusDonut:     statusDonut,
 		MethodDonut:     methodDonut,
 		UserAgentDonut:  userAgentDonut,

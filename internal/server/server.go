@@ -66,11 +66,15 @@ func New(cfg *config.Config, database *sql.DB, templatesFS, staticFS fs.FS) *Ser
 		"sparklineSVG":    sparklineSVG,
 	}
 
-	// Parse overview templates (layout + overview + partial)
+	// Parse overview templates (layout + overview + tab partials)
 	overviewTmpl := template.Must(template.New("").Funcs(funcMap).ParseFS(tmplFS,
 		"layout.html",
 		"overview.html",
-		"overview_partial.html",
+		"overview_tab_summary.html",
+		"overview_tab_traffic.html",
+		"overview_tab_status.html",
+		"overview_tab_devices.html",
+		"overview_tab_performance.html",
 	))
 
 	// Parse security templates (layout + security + partial)
