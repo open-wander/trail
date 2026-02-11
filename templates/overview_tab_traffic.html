@@ -1,0 +1,72 @@
+<!-- Top Paths Panel -->
+<div class="card" id="panel-paths">
+    <h3>Top Paths
+        <button class="btn btn-ghost" style="float:right; font-size: 0.8rem;" hx-get="/api/panel/paths?page=1&limit=10&sort=count&order=desc" hx-target="#panel-paths" hx-swap="innerHTML" hx-include="#filter-form">Paginated View</button>
+    </h3>
+    {{if .TopPaths}}
+    <table>
+        <thead>
+            <tr><th>Path</th><th>Requests</th><th>%</th><th>Bytes</th><th>Avg Ms</th><th>Trend</th></tr>
+        </thead>
+        <tbody>
+            {{range .TopPaths}}
+            <tr class="drilldown-trigger" hx-get="/api/drilldown/path?path={{.Path}}" hx-target="next .drilldown-row" hx-swap="innerHTML" hx-include="#filter-form">
+                <td>{{.Path}}</td>
+                <td>{{formatNumber .Count}}</td>
+                <td>{{formatPct .Pct}}</td>
+                <td>{{formatBytes .Bytes}}</td>
+                <td>{{.AvgMs}} ms</td>
+                <td>{{sparklineSVG .Trend}}</td>
+            </tr>
+            <tr class="drilldown-row" style="display:none;"><td colspan="6"><div class="drilldown-content"></div></td></tr>
+            {{end}}
+        </tbody>
+    </table>
+    {{else}}
+    <p style="color: var(--text-secondary);">No paths found for the selected period.</p>
+    {{end}}
+</div>
+
+<!-- Top Referrers Panel -->
+<div class="card" id="panel-referrers">
+    <h3>Top Referrers</h3>
+    {{if .TopReferrers}}
+    <div class="chart-horizontal">
+        {{range .TopReferrers}}
+        <div class="chart-row">
+            <div class="chart-row-label" style="width: 200px;">{{.Referrer}}</div>
+            <div class="chart-row-track">
+                <div class="chart-row-fill" style="width: {{pct .Count $.MaxReferrer}}%;"></div>
+            </div>
+            <div class="chart-row-value">{{formatNumber .Count}}</div>
+        </div>
+        {{end}}
+    </div>
+    {{else}}
+    <p style="color: var(--text-secondary);">No referrer data available.</p>
+    {{end}}
+</div>
+
+<!-- 404 Paths Panel -->
+<div class="card" id="panel-not-found">
+    <h3>Not Found (404)
+        <button class="btn btn-ghost" style="float:right; font-size: 0.8rem;" hx-get="/api/panel/not-found?page=1&limit=10" hx-target="#panel-not-found" hx-swap="innerHTML" hx-include="#filter-form">Paginated View</button>
+    </h3>
+    {{if .NotFoundPaths}}
+    <table>
+        <thead><tr><th>Path</th><th>Hits</th><th>Bytes</th></tr></thead>
+        <tbody>
+            {{range .NotFoundPaths}}
+            <tr class="drilldown-trigger" hx-get="/api/drilldown/path?path={{.Path}}" hx-target="next .drilldown-row" hx-swap="innerHTML" hx-include="#filter-form">
+                <td>{{.Path}}</td>
+                <td>{{formatNumber .Count}}</td>
+                <td>{{formatBytes .Bytes}}</td>
+            </tr>
+            <tr class="drilldown-row" style="display:none;"><td colspan="3"><div class="drilldown-content"></div></td></tr>
+            {{end}}
+        </tbody>
+    </table>
+    {{else}}
+    <p style="color: var(--text-secondary);">No 404 paths found.</p>
+    {{end}}
+</div>

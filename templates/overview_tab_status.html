@@ -1,0 +1,58 @@
+<div class="card">
+    <h3>Status Code Breakdown</h3>
+    {{if .StatusCodes}}
+    <div class="chart-horizontal">
+        {{range .StatusCodes}}
+        <div class="chart-row drilldown-trigger" hx-get="/api/drilldown/status?class={{.Class}}" hx-target="#status-drilldown" hx-swap="innerHTML" hx-include="#filter-form">
+            <div class="chart-row-label">{{.Class}}</div>
+            <div class="chart-row-track">
+                <div class="chart-row-fill" style="width: {{pct .Count $.MaxStatus}}%; background: {{statusColor .Class}};"></div>
+            </div>
+            <div class="chart-row-value">{{formatNumber .Count}}</div>
+        </div>
+        {{end}}
+    </div>
+    <div id="status-drilldown"></div>
+    {{else}}
+    <p style="color: var(--text-secondary);">No status data available.</p>
+    {{end}}
+</div>
+
+<div class="card">
+    <h3>HTTP Status Codes</h3>
+    {{if .StatusDetails}}
+    <div class="chart-horizontal">
+        {{range .StatusDetails}}
+        <div class="chart-row drilldown-trigger" hx-get="/api/drilldown/status-code?code={{.Status}}" hx-target="#status-code-drilldown" hx-swap="innerHTML" hx-include="#filter-form">
+            <div class="chart-row-label">{{.Status}}</div>
+            <div class="chart-row-track">
+                <div class="chart-row-fill" style="width: {{pct .Count $.MaxStatusDet}}%; background: {{statusCodeColor .Status}};"></div>
+            </div>
+            <div class="chart-row-value">{{formatNumber .Count}} <span style="color: var(--text-secondary); font-size: 0.8rem;">({{formatPct .Pct}})</span></div>
+        </div>
+        {{end}}
+    </div>
+    <div id="status-code-drilldown"></div>
+    {{else}}
+    <p style="color: var(--text-secondary);">No status code data available.</p>
+    {{end}}
+</div>
+
+<div class="card">
+    <h3>HTTP Methods</h3>
+    {{if .Methods}}
+    <div class="chart-horizontal">
+        {{range .Methods}}
+        <div class="chart-row">
+            <div class="chart-row-label">{{.Method}}</div>
+            <div class="chart-row-track">
+                <div class="chart-row-fill" style="width: {{pct .Count $.MaxMethod}}%;"></div>
+            </div>
+            <div class="chart-row-value">{{formatNumber .Count}} <span style="color: var(--text-secondary); font-size: 0.8rem;">({{formatPct .Pct}})</span></div>
+        </div>
+        {{end}}
+    </div>
+    {{else}}
+    <p style="color: var(--text-secondary);">No method data available.</p>
+    {{end}}
+</div>

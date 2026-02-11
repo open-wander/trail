@@ -1,8 +1,9 @@
 {{define "content"}}
 <!-- Filter Bar -->
-<div class="card" style="margin-bottom: 20px;">
-    <form id="filter-form" hx-get="/api/overview" hx-target="#dashboard-content" hx-trigger="change, every 30s" hx-swap="innerHTML">
+<div class="card" style="margin-bottom: 1rem;">
+    <form id="filter-form" hx-get="/api/overview" hx-target="#tab-content" hx-trigger="change" hx-swap="innerHTML">
         <input type="hidden" name="range" id="range-input" value="{{.Range}}">
+        <input type="hidden" name="tab" id="tab-input" value="{{.ActiveTab}}">
         <input type="hidden" name="custom_from" id="custom-from-hidden" value="{{.CustomFrom}}">
         <input type="hidden" name="custom_to" id="custom-to-hidden" value="{{.CustomTo}}">
 
@@ -12,13 +13,13 @@
                 <button type="button" class="filter-btn {{if eq .Range "today"}}active{{end}}" onclick="setRange(this, 'today')">Today</button>
                 <button type="button" class="filter-btn {{if eq .Range "7d"}}active{{end}}" onclick="setRange(this, '7d')">7 Days</button>
                 <button type="button" class="filter-btn {{if eq .Range "30d"}}active{{end}}" onclick="setRange(this, '30d')">30 Days</button>
-                <button type="button" class="filter-btn {{if eq .Range "custom"}}active{{end}}" id="custom-btn" onclick="setRange(this, 'custom')">Custom</button>
+                <button type="button" class="filter-btn {{if eq .Range "custom"}}active{{end}}" onclick="setRange(this, 'custom')">Custom</button>
             </div>
 
-            <!-- Custom date inputs (hidden by default) -->
+            <!-- Custom date inputs -->
             <div id="custom-dates" style="display: {{if eq .Range "custom"}}flex{{else}}none{{end}}; gap: 5px; align-items: center;">
                 <input type="date" id="custom-from" value="{{if .CustomFrom}}{{.CustomFrom}}{{else}}{{formatDate -7}}{{end}}" onchange="updateCustomDates()">
-                <span class="text-secondary">to</span>
+                <span style="color: var(--text-secondary);">to</span>
                 <input type="date" id="custom-to" value="{{if .CustomTo}}{{.CustomTo}}{{else}}{{formatDate 0}}{{end}}" onchange="updateCustomDates()">
             </div>
 
@@ -39,17 +40,32 @@
     </form>
 </div>
 
-<!-- Dashboard Content (swappable) -->
-<div id="dashboard-content">
-    {{template "overview_partial.html" .}}
+<!-- Tab Bar -->
+<div class="tab-list" style="margin-bottom: 1rem;">
+    <button class="tab {{if eq .ActiveTab "summary"}}tab-active{{end}}" onclick="switchTab(this, 'summary')">Summary</button>
+    <button class="tab {{if eq .ActiveTab "traffic"}}tab-active{{end}}" onclick="switchTab(this, 'traffic')">Traffic</button>
+    <button class="tab {{if eq .ActiveTab "status"}}tab-active{{end}}" onclick="switchTab(this, 'status')">Status</button>
+    <button class="tab {{if eq .ActiveTab "devices"}}tab-active{{end}}" onclick="switchTab(this, 'devices')">Devices</button>
+    <button class="tab {{if eq .ActiveTab "performance"}}tab-active{{end}}" onclick="switchTab(this, 'performance')">Performance</button>
+</div>
+
+<!-- Tab Content (swappable via htmx) -->
+<div id="tab-content">
+    {{template "overview_tab_summary.html" .}}
 </div>
 
 <script>
+function switchTab(btn, tab) {
+    document.getElementById('tab-input').value = tab;
+    document.querySelectorAll('.tab-list .tab').forEach(function(t) { t.classList.remove('tab-active'); });
+    btn.classList.add('tab-active');
+    htmx.ajax('GET', '/api/overview?' + new URLSearchParams(new FormData(document.getElementById('filter-form'))).toString(), {target: '#tab-content', swap: 'innerHTML'});
+}
+
 function setRange(btn, val) {
     document.getElementById('range-input').value = val;
     document.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
     btn.classList.add('active');
-
     var customDates = document.getElementById('custom-dates');
     if (val === 'custom') {
         customDates.style.display = 'flex';
@@ -59,7 +75,7 @@ function setRange(btn, val) {
         document.getElementById('custom-from-hidden').value = '';
         document.getElementById('custom-to-hidden').value = '';
     }
-    htmx.trigger(document.getElementById('filter-form'), 'change');
+    htmx.ajax('GET', '/api/overview?' + new URLSearchParams(new FormData(document.getElementById('filter-form'))).toString(), {target: '#tab-content', swap: 'innerHTML'});
 }
 
 function updateCustomDates() {
@@ -67,14 +83,12 @@ function updateCustomDates() {
     document.getElementById('custom-to-hidden').value = document.getElementById('custom-to').value;
 }
 
-// Toggle drilldown rows on click
-document.addEventListener('htmx:afterSwap', function(evt) {
-    var target = evt.detail.target;
-    if (target && target.classList && target.classList.contains('drilldown-row')) {
-        target.style.display = target.style.display === 'none' ? '' : 'table-row';
-    }
-});
+// Auto-refresh every 30s
+setInterval(function() {
+    htmx.ajax('GET', '/api/overview?' + new URLSearchParams(new FormData(document.getElementById('filter-form'))).toString(), {target: '#tab-content', swap: 'innerHTML'});
+}, 30000);
 
+// Drilldown toggle
 document.addEventListener('click', function(evt) {
     var trigger = evt.target.closest('.drilldown-trigger');
     if (!trigger) return;

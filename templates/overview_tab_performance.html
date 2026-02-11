@@ -1,0 +1,87 @@
+{{if .Percentiles}}
+<div class="stats-row">
+    <div class="stat-card"><div class="stat-value">{{.Percentiles.P50}} ms</div><div class="stat-label">p50 (Median)</div></div>
+    <div class="stat-card"><div class="stat-value">{{.Percentiles.P95}} ms</div><div class="stat-label">p95</div></div>
+    <div class="stat-card"><div class="stat-value">{{.Percentiles.P99}} ms</div><div class="stat-label">p99</div></div>
+</div>
+{{end}}
+
+<div class="card">
+    <h3>Response Time Distribution</h3>
+    {{if .DurationHist}}
+    <div class="chart-horizontal">
+        {{range .DurationHist}}
+        <div class="chart-row">
+            <div class="chart-row-label" style="width: 100px;">{{.Bucket}}</div>
+            <div class="chart-row-track"><div class="chart-row-fill" style="width: {{pct .Count $.MaxDurationHist}}%;"></div></div>
+            <div class="chart-row-value">{{formatNumber .Count}} <span style="color: var(--text-secondary); font-size: 0.8rem;">({{formatPct .Pct}})</span></div>
+        </div>
+        {{end}}
+    </div>
+    {{else}}
+    <p style="color: var(--text-secondary);">No response time data available.</p>
+    {{end}}
+</div>
+
+<div class="card">
+    <h3>Bandwidth Over Time</h3>
+    {{if .BandwidthChart}}
+    <div class="timeseries-chart">
+        {{range .BandwidthChart}}
+        <div class="timeseries-col">
+            <div class="timeseries-value">{{formatBytes .Count}}</div>
+            <div class="timeseries-bars" style="height: {{pct .Count $.MaxBandwidth}}%;">
+                <div class="timeseries-bar-hits" style="height: 100%;"></div>
+            </div>
+            <div class="timeseries-label">{{formatTimeLabel .Label}}</div>
+        </div>
+        {{end}}
+    </div>
+    {{else}}
+    <p style="color: var(--text-secondary);">No bandwidth data available.</p>
+    {{end}}
+</div>
+
+<div class="card">
+    <h3>Response Time Trend</h3>
+    {{if .ResponseTimeChart}}
+    <div class="timeseries-chart">
+        {{range .ResponseTimeChart}}
+        <div class="timeseries-col">
+            <div class="timeseries-value">{{.Count}} ms</div>
+            <div class="timeseries-bars" style="height: {{pct .Count $.MaxResponseTime}}%;">
+                <div class="timeseries-bar-hits" style="height: 100%; background: var(--warning);"></div>
+            </div>
+            <div class="timeseries-label">{{formatTimeLabel .Label}}</div>
+        </div>
+        {{end}}
+    </div>
+    {{else}}
+    <p style="color: var(--text-secondary);">No response time trend data available.</p>
+    {{end}}
+</div>
+
+<div class="card">
+    <h3>Time Distribution (Hour of Day)</h3>
+    {{if .HourOfDay}}
+    <div class="hour-chart">
+        {{$hourData := .HourOfDay}}{{$hourVisitors := .HourVisitors}}{{$maxHour := .MaxHourOfDay}}
+        {{range $i, $h := $hourData}}
+        <div class="hour-bar">
+            <div class="hour-bar-fills" style="height: {{pct $h.Count $maxHour}}%;">
+                <div class="hour-bar-fill" style="height: 100%;"></div>
+                {{range $hourVisitors}}{{if eq .Hour $h.Hour}}{{if gt .Count 0}}<div class="hour-bar-fill-visitors" style="height: {{pct .Count $h.Count}}%;"></div>{{end}}{{end}}{{end}}
+            </div>
+            <div class="hour-bar-label">{{$h.Hour}}</div>
+            <div class="hour-bar-value">{{formatNumber $h.Count}}</div>
+        </div>
+        {{end}}
+    </div>
+    <div class="chart-legend">
+        <span class="chart-legend-item"><span class="chart-legend-dot" style="background: var(--brand);"></span> Requests</span>
+        <span class="chart-legend-item"><span class="chart-legend-dot" style="background: var(--success);"></span> Visitors</span>
+    </div>
+    {{else}}
+    <p style="color: var(--text-secondary);">No hourly data available.</p>
+    {{end}}
+</div>

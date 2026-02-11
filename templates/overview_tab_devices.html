@@ -1,0 +1,87 @@
+<!-- User Agents -->
+<div class="card">
+    <h3>User Agents</h3>
+    {{if .UserAgents}}
+        <div class="chart-horizontal">
+            {{range .UserAgents}}
+            <div class="chart-row">
+                <div class="chart-row-label">{{.Category}}</div>
+                <div class="chart-row-bar-wrapper">
+                    <div class="chart-row-bar" style="width: {{pct .Count $.MaxUserAgent}}%;"></div>
+                </div>
+                <div class="chart-row-value">{{formatNumber .Count}} <span class="text-secondary text-small">({{formatPct .Pct}})</span></div>
+            </div>
+            {{end}}
+        </div>
+    {{else}}
+        <p class="text-secondary">No user agent data available.</p>
+    {{end}}
+</div>
+
+<!-- Browser Distribution -->
+<div class="card">
+    <h3>Browser Distribution</h3>
+    {{if .Browsers}}
+        <div class="chart-horizontal">
+            {{range .Browsers}}
+            <div class="chart-row">
+                <div class="chart-row-label">{{.Browser}}</div>
+                <div class="chart-row-bar-wrapper">
+                    <div class="chart-row-bar" style="width: {{pct .Count $.MaxBrowser}}%;"></div>
+                </div>
+                <div class="chart-row-value">{{formatNumber .Count}} <span class="text-secondary text-small">({{formatPct .Pct}})</span></div>
+            </div>
+            {{end}}
+        </div>
+    {{else}}
+        <p class="text-secondary">No browser data available.</p>
+    {{end}}
+</div>
+
+<!-- OS Distribution -->
+<div class="card">
+    <h3>OS Distribution</h3>
+    {{if .OSStats}}
+        <div class="chart-horizontal">
+            {{range .OSStats}}
+            <div class="chart-row">
+                <div class="chart-row-label">{{.OS}}</div>
+                <div class="chart-row-bar-wrapper">
+                    <div class="chart-row-bar" style="width: {{pct .Count $.MaxOS}}%;"></div>
+                </div>
+                <div class="chart-row-value">{{formatNumber .Count}} <span class="text-secondary text-small">({{formatPct .Pct}})</span></div>
+            </div>
+            {{end}}
+        </div>
+        {{if or (gt .MobilePct 0.0) (gt .DesktopPct 0.0)}}
+        <div style="margin-top: 1rem; display: flex; gap: 2rem;">
+            <span style="color: var(--text-secondary);">Mobile: <strong style="color: var(--text-primary);">{{formatPct .MobilePct}}</strong></span>
+            <span style="color: var(--text-secondary);">Desktop: <strong style="color: var(--text-primary);">{{formatPct .DesktopPct}}</strong></span>
+        </div>
+        {{end}}
+    {{else}}
+        <p class="text-secondary">No OS data available.</p>
+    {{end}}
+</div>
+
+<!-- Countries -->
+{{if .GeoIPEnabled}}
+<div class="card">
+    <h3>Countries</h3>
+    {{if .Countries}}
+        <div class="chart-horizontal">
+            {{range .Countries}}
+            <div class="chart-row">
+                <div class="chart-row-label">{{.Country}}</div>
+                <div class="chart-row-bar-wrapper">
+                    <div class="chart-row-bar" style="width: {{pct .Count $.MaxCountry}}%;"></div>
+                </div>
+                <div class="chart-row-value">{{formatNumber .Count}} <span class="text-secondary text-small">({{formatPct .Pct}})</span></div>
+            </div>
+            {{end}}
+        </div>
+    {{else}}
+        <p class="text-secondary">No country data available.</p>
+    {{end}}
+</div>
+{{end}}
