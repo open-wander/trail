@@ -1,5 +1,11 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
+<script>
+(function() {
+    var t = localStorage.getItem('trail-theme');
+    if (t === 'light') document.documentElement.setAttribute('data-theme', 'light');
+})();
+</script>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -20,13 +26,30 @@
                 <a href="/" class="sidebar-nav-item {{if eq .Page "overview"}}sidebar-nav-item-active{{end}}">Overview</a>
                 <a href="/security" class="sidebar-nav-item {{if eq .Page "security"}}sidebar-nav-item-active{{end}}">Security</a>
             </nav>
-            <div class="sidebar-footer" id="theme-toggle">
-                <!-- Theme toggle will be wired in a later task -->
+            <div class="sidebar-footer">
+                <button id="theme-toggle" class="filter-btn" onclick="toggleTheme()" style="width: 100%; text-align: center;">
+                    <span id="theme-icon">Dark</span>
+                </button>
             </div>
         </aside>
         <main class="layout-content">
             {{template "content" .}}
         </main>
     </div>
+<script>
+function toggleTheme() {
+    var html = document.documentElement;
+    var current = html.getAttribute('data-theme');
+    var next = current === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    localStorage.setItem('trail-theme', next);
+    updateThemeLabel(next);
+}
+function updateThemeLabel(theme) {
+    var el = document.getElementById('theme-icon');
+    if (el) el.textContent = theme === 'dark' ? 'Dark' : 'Light';
+}
+updateThemeLabel(document.documentElement.getAttribute('data-theme'));
+</script>
 </body>
 </html>
