@@ -1,0 +1,331 @@
+/* ============================================================
+   Trail-Specific Styles
+   Application-specific styles not covered by component library
+   ============================================================ */
+
+/* --- Sparklines --- */
+.sparkline {
+    width: 60px;
+    height: 20px;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.sparkline polyline {
+    fill: none;
+    stroke: var(--brand);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+
+/* --- Timeseries Vertical Bar Chart --- */
+.timeseries-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 200px;
+    padding-top: 10px;
+    overflow-x: auto;
+}
+
+.timeseries-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    height: 100%;
+    position: relative;
+    min-width: 0;
+}
+
+.timeseries-bars {
+    width: 100%;
+    position: relative;
+    background-color: var(--surface-3);
+    border-radius: 2px 2px 0 0;
+    overflow: hidden;
+    transition: height var(--duration) var(--ease-out);
+    min-height: 2px;
+}
+
+.timeseries-bar-hits {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: var(--brand);
+    opacity: 0.7;
+    border-radius: 2px 2px 0 0;
+    transition: height var(--duration) var(--ease-out);
+}
+
+.timeseries-bar-visitors {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: var(--success);
+    opacity: 0.8;
+    border-radius: 2px 2px 0 0;
+    transition: height var(--duration) var(--ease-out);
+}
+
+.timeseries-label {
+    font-family: "SF Mono", "Menlo", "Monaco", monospace;
+    font-size: 10px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    margin-top: 4px;
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+.timeseries-value {
+    font-size: 9px;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+    position: absolute;
+    top: -2px;
+    transform: translateY(-100%);
+    white-space: nowrap;
+}
+
+.timeseries-value-visitors {
+    color: var(--success);
+    top: auto;
+    bottom: -2px;
+    transform: translateY(100%);
+    position: absolute;
+}
+
+/* Timeseries row variant (used in security page) */
+.timeseries-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+}
+
+
+/* --- Hour of Day Chart --- */
+.hour-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 150px;
+    padding-top: 10px;
+}
+
+.hour-bar {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    height: 100%;
+    position: relative;
+}
+
+.hour-bar-fills {
+    width: 100%;
+    position: relative;
+    border-radius: 2px 2px 0 0;
+    overflow: hidden;
+    min-height: 2px;
+}
+
+.hour-bar-fill {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: var(--brand);
+    opacity: 0.7;
+    border-radius: 2px 2px 0 0;
+    min-height: 2px;
+    transition: height var(--duration) var(--ease-out);
+}
+
+.hour-bar-fill-visitors {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: var(--success);
+    border-radius: 2px 2px 0 0;
+    transition: height var(--duration) var(--ease-out);
+    opacity: 0.8;
+}
+
+.hour-bar-label {
+    font-size: 10px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+    text-align: center;
+}
+
+.hour-bar-value {
+    font-size: 9px;
+    color: var(--text-secondary);
+    position: absolute;
+    top: -2px;
+    transform: translateY(-100%);
+    white-space: nowrap;
+}
+
+
+/* --- Drilldown Expand/Collapse --- */
+.drilldown-trigger {
+    cursor: pointer;
+    transition: background-color var(--duration) var(--ease-out);
+}
+
+.drilldown-trigger:hover {
+    background-color: var(--surface-2);
+}
+
+.drilldown-row {
+    background-color: transparent;
+}
+
+.drilldown-row:hover {
+    background-color: transparent;
+}
+
+.drilldown-content {
+    border-left: 3px solid var(--brand);
+    background-color: var(--surface-0);
+    padding: 12px 16px;
+    margin: 8px 0;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.drilldown-content table {
+    margin-top: 8px;
+}
+
+.drilldown-header {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--brand);
+    margin-bottom: 8px;
+}
+
+
+/* --- Filter Bar --- */
+.filter-bar {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.filter-btn {
+    background-color: var(--surface-2);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-default);
+    padding: 6px 14px;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-size: 13px;
+    transition: all var(--duration) var(--ease-out);
+}
+
+.filter-btn:hover {
+    border-color: var(--brand);
+    color: var(--text-primary);
+}
+
+.filter-btn.active {
+    background-color: var(--brand);
+    color: var(--brand-text);
+    border-color: var(--brand);
+}
+
+
+/* --- Tab Active State (htmx-driven) --- */
+.tab-list .tab-active {
+    background: var(--brand-subtle);
+    color: var(--brand);
+    border-color: var(--brand);
+    font-weight: 600;
+}
+
+
+/* --- Stats Cards Layout --- */
+.card-grid .stat {
+    background-color: var(--surface-2);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 15px;
+    text-align: center;
+    transition: all var(--duration) var(--ease-out);
+}
+
+.card-grid .stat:hover {
+    border-color: var(--border-hover);
+    box-shadow: var(--shadow-sm);
+}
+
+.stat-value {
+    font-size: 32px;
+    font-weight: 600;
+    color: var(--brand);
+    display: block;
+    margin-bottom: 5px;
+    line-height: 1.2;
+}
+
+.stat-label {
+    color: var(--text-secondary);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 500;
+}
+
+
+/* --- Sidebar Footer (Theme Toggle Placement) --- */
+.sidebar-footer {
+    margin-top: auto;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border-subtle);
+}
+
+
+/* --- Responsive Adjustments --- */
+@media (max-width: 768px) {
+    .timeseries-chart {
+        height: 140px;
+    }
+
+    .timeseries-label {
+        font-size: 8px;
+    }
+
+    .timeseries-value {
+        display: none;
+    }
+
+    .hour-chart {
+        height: 100px;
+    }
+
+    .hour-bar-value {
+        display: none;
+    }
+
+    .sparkline {
+        width: 40px;
+        height: 16px;
+    }
+
+    .stat-value {
+        font-size: 24px;
+    }
+}
