@@ -1,6 +1,7 @@
 # Binary
 /trail
 bin/
+logs/
 *.exe
 .claude
 
