@@ -310,7 +310,7 @@ func statusColor(class string) string {
 	case "2xx":
 		return "var(--success)"
 	case "3xx":
-		return "var(--accent)"
+		return "var(--brand)"
 	case "4xx":
 		return "var(--warning)"
 	case "5xx":
@@ -373,7 +373,7 @@ func formatDate(offsetDays int) string {
 // conicGradient generates a CSS conic-gradient value from donut segments
 func conicGradient(segments []DonutSegment) string {
 	if len(segments) == 0 {
-		return "var(--bg-tertiary)"
+		return "var(--surface-2)"
 	}
 	var parts []string
 	for _, s := range segments {

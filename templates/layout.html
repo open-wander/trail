@@ -1,21 +1,32 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Trail - Analytics</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/css/pico.min.css">
+    <link rel="stylesheet" href="/static/css/components.css">
+    <link rel="stylesheet" href="/static/css/trail.css">
     <script src="/static/htmx.min.js"></script>
+    <script defer src="/static/js/alpine.min.js"></script>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>Trail</h1>
-            <nav>
-                <a href="/" {{if eq .Page "overview"}}style="font-weight:bold"{{end}}>Overview</a> | <a href="/security" {{if eq .Page "security"}}style="font-weight:bold"{{end}}>Security</a>
+    <div class="layout-sidebar">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>Trail</h2>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="/" class="sidebar-nav-item {{if eq .Page "overview"}}sidebar-nav-item-active{{end}}">Overview</a>
+                <a href="/security" class="sidebar-nav-item {{if eq .Page "security"}}sidebar-nav-item-active{{end}}">Security</a>
             </nav>
-        </header>
-        {{template "content" .}}
+            <div class="sidebar-footer" id="theme-toggle">
+                <!-- Theme toggle will be wired in a later task -->
+            </div>
+        </aside>
+        <main class="layout-content">
+            {{template "content" .}}
+        </main>
     </div>
 </body>
 </html>

@@ -82,7 +82,7 @@ func TestStatusColor(t *testing.T) {
 		expected string
 	}{
 		{"2xx success", "2xx", "var(--success)"},
-		{"3xx redirect", "3xx", "var(--accent)"},
+		{"3xx redirect", "3xx", "var(--brand)"},
 		{"4xx client error", "4xx", "var(--warning)"},
 		{"5xx server error", "5xx", "var(--error)"},
 		{"unknown", "unknown", "var(--text-secondary)"},
