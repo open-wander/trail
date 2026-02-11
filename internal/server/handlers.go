@@ -354,7 +354,7 @@ func (s *Server) getOverviewData(c *fiber.Ctx) (*OverviewData, error) {
 	// Build status code donut segments
 	statusDonutColors := map[string]string{
 		"2xx":   "var(--success)",
-		"3xx":   "var(--accent)",
+		"3xx":   "var(--brand)",
 		"4xx":   "var(--warning)",
 		"5xx":   "var(--error)",
 		"other": "var(--text-secondary)",

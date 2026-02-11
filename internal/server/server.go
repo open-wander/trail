@@ -337,7 +337,7 @@ func statusCodeColor(status int) string {
 	case status >= 200 && status < 300:
 		return "var(--success)"
 	case status >= 300 && status < 400:
-		return "var(--accent)"
+		return "var(--brand)"
 	case status >= 400 && status < 500:
 		return "var(--warning)"
 	case status >= 500 && status < 600:
