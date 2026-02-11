@@ -3,6 +3,14 @@
    Application-specific styles not covered by component library
    ============================================================ */
 
+/* --- Chart Row Overrides --- */
+.chart-row-value {
+    width: auto;
+    min-width: 100px;
+    text-align: right;
+    white-space: nowrap;
+}
+
 /* --- Sparklines --- */
 .sparkline {
     width: 60px;
