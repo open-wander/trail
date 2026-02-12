@@ -1,14 +1,14 @@
 <div class="drilldown-content">
     <div class="drilldown-header">Breakdown for {{.Path}}</div>
     {{if .Details}}
-    <table>
+    <table class="table-striped table-hover">
         <thead>
             <tr>
                 <th>Method</th>
                 <th>Status</th>
-                <th>Requests</th>
-                <th>Bytes</th>
-                <th>Avg Ms</th>
+                <th class="text-right">Requests</th>
+                <th class="text-right">Bytes</th>
+                <th class="text-right">Avg Ms</th>
             </tr>
         </thead>
         <tbody>
@@ -16,14 +16,16 @@
             <tr>
                 <td><span class="method-badge">{{.Method}}</span></td>
                 <td><span style="color: {{statusCodeColor .Status}};">{{.Status}}</span></td>
-                <td>{{formatNumber .Count}}</td>
-                <td>{{formatBytes .Bytes}}</td>
-                <td>{{.AvgMs}} ms</td>
+                <td class="text-right text-tabular">{{formatNumber .Count}}</td>
+                <td class="text-right text-tabular">{{formatBytes .Bytes}}</td>
+                <td class="text-right text-tabular">{{.AvgMs}} ms</td>
             </tr>
             {{end}}
         </tbody>
     </table>
     {{else}}
-    <p class="text-secondary">No detail data available.</p>
+    <div class="empty-state" style="min-height: 80px; padding: 1rem;">
+        <div class="empty-state-description">No detail data available.</div>
+    </div>
     {{end}}
 </div>

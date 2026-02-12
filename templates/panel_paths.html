@@ -2,20 +2,20 @@
     Top Paths
     <span class="text-secondary text-small">({{formatNumber .TotalCount}} total)</span>
 </div>
-<table>
+<table class="table-striped table-hover">
     <thead>
         <tr>
             <th class="sort-header" hx-get="/api/panel/paths?sort=path&order={{if and (eq .Sort "path") (eq .Order "asc")}}desc{{else}}asc{{end}}&limit={{.Limit}}&page=1" hx-target="#panel-paths" hx-swap="innerHTML" hx-include="#filter-form">
                 Path {{if eq .Sort "path"}}{{if eq .Order "asc"}}&#9650;{{else}}&#9660;{{end}}{{end}}
             </th>
-            <th class="sort-header" hx-get="/api/panel/paths?sort=count&order={{if and (eq .Sort "count") (eq .Order "desc")}}asc{{else}}desc{{end}}&limit={{.Limit}}&page=1" hx-target="#panel-paths" hx-swap="innerHTML" hx-include="#filter-form">
+            <th class="sort-header text-right" hx-get="/api/panel/paths?sort=count&order={{if and (eq .Sort "count") (eq .Order "desc")}}asc{{else}}desc{{end}}&limit={{.Limit}}&page=1" hx-target="#panel-paths" hx-swap="innerHTML" hx-include="#filter-form">
                 Requests {{if eq .Sort "count"}}{{if eq .Order "asc"}}&#9650;{{else}}&#9660;{{end}}{{end}}
             </th>
-            <th>%</th>
-            <th class="sort-header" hx-get="/api/panel/paths?sort=bytes&order={{if and (eq .Sort "bytes") (eq .Order "desc")}}asc{{else}}desc{{end}}&limit={{.Limit}}&page=1" hx-target="#panel-paths" hx-swap="innerHTML" hx-include="#filter-form">
+            <th class="text-right">%</th>
+            <th class="sort-header text-right" hx-get="/api/panel/paths?sort=bytes&order={{if and (eq .Sort "bytes") (eq .Order "desc")}}asc{{else}}desc{{end}}&limit={{.Limit}}&page=1" hx-target="#panel-paths" hx-swap="innerHTML" hx-include="#filter-form">
                 Bytes {{if eq .Sort "bytes"}}{{if eq .Order "asc"}}&#9650;{{else}}&#9660;{{end}}{{end}}
             </th>
-            <th class="sort-header" hx-get="/api/panel/paths?sort=avg_ms&order={{if and (eq .Sort "avg_ms") (eq .Order "desc")}}asc{{else}}desc{{end}}&limit={{.Limit}}&page=1" hx-target="#panel-paths" hx-swap="innerHTML" hx-include="#filter-form">
+            <th class="sort-header text-right" hx-get="/api/panel/paths?sort=avg_ms&order={{if and (eq .Sort "avg_ms") (eq .Order "desc")}}asc{{else}}desc{{end}}&limit={{.Limit}}&page=1" hx-target="#panel-paths" hx-swap="innerHTML" hx-include="#filter-form">
                 Avg Ms {{if eq .Sort "avg_ms"}}{{if eq .Order "asc"}}&#9650;{{else}}&#9660;{{end}}{{end}}
             </th>
         </tr>
@@ -24,15 +24,15 @@
         {{range .Paths}}
         <tr class="drilldown-trigger" hx-get="/api/drilldown/path?path={{.Path}}" hx-target="next .drilldown-row" hx-swap="innerHTML" hx-include="#filter-form">
             <td>{{.Path}}</td>
-            <td>
+            <td class="text-right">
                 <span class="pct-bar-wrap">
                     {{formatNumber .Count}}
                     {{if $.TotalReqs}}<span class="pct-bar" style="width: {{pct .Count $.TotalReqs}}%;"></span>{{end}}
                 </span>
             </td>
-            <td>{{formatPct .Pct}}</td>
-            <td>{{formatBytes .Bytes}}</td>
-            <td>{{.AvgMs}} ms</td>
+            <td class="text-right text-tabular">{{formatPct .Pct}}</td>
+            <td class="text-right text-tabular">{{formatBytes .Bytes}}</td>
+            <td class="text-right text-tabular">{{.AvgMs}} ms</td>
         </tr>
         <tr class="drilldown-row" style="display:none;"><td colspan="5"><div class="drilldown"></div></td></tr>
         {{end}}

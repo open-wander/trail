@@ -3,26 +3,29 @@
     <div class="card-header">Slowest Paths</div>
     {{if .SlowestPaths}}
         <div class="overflow-x-auto">
-            <table>
+            <table class="table-striped table-hover">
                 <thead>
                     <tr>
                         <th>Path</th>
-                        <th>Avg Response Time</th>
-                        <th>Requests</th>
+                        <th class="text-right">Avg Response Time</th>
+                        <th class="text-right">Requests</th>
                     </tr>
                 </thead>
                 <tbody>
                     {{range .SlowestPaths}}
                     <tr>
                         <td><code>{{.Path}}</code></td>
-                        <td style="color: var(--warning);">{{.AvgMs}} ms</td>
-                        <td>{{formatNumber .Count}}</td>
+                        <td class="text-right text-tabular" style="color: var(--warning);">{{.AvgMs}} ms</td>
+                        <td class="text-right text-tabular">{{formatNumber .Count}}</td>
                     </tr>
                     {{end}}
                 </tbody>
             </table>
         </div>
     {{else}}
-        <p class="text-secondary">No path data available.</p>
+        <div class="empty-state" style="min-height: 120px; padding: 2rem;">
+            <div class="empty-state-title">No data available</div>
+            <div class="empty-state-description">No path data available for this period.</div>
+        </div>
     {{end}}
 </div>

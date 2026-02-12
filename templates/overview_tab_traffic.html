@@ -4,18 +4,18 @@
         <button class="btn btn-ghost" style="float:right; font-size: 0.8rem;" hx-get="/api/panel/paths?page=1&limit=10&sort=count&order=desc" hx-target="#panel-paths" hx-swap="innerHTML" hx-include="#filter-form">Paginated View</button>
     </h3>
     {{if .TopPaths}}
-    <table>
+    <table class="table-striped table-hover">
         <thead>
-            <tr><th>Path</th><th>Requests</th><th>%</th><th>Bytes</th><th>Avg Ms</th><th>Trend</th></tr>
+            <tr><th>Path</th><th class="text-right">Requests</th><th class="text-right">%</th><th class="text-right">Bytes</th><th class="text-right">Avg Ms</th><th>Trend</th></tr>
         </thead>
         <tbody>
             {{range .TopPaths}}
             <tr class="drilldown-trigger" hx-get="/api/drilldown/path?path={{.Path}}" hx-target="next .drilldown-row" hx-swap="innerHTML" hx-include="#filter-form">
                 <td>{{.Path}}</td>
-                <td>{{formatNumber .Count}}</td>
-                <td>{{formatPct .Pct}}</td>
-                <td>{{formatBytes .Bytes}}</td>
-                <td>{{.AvgMs}} ms</td>
+                <td class="text-right text-tabular">{{formatNumber .Count}}</td>
+                <td class="text-right text-tabular">{{formatPct .Pct}}</td>
+                <td class="text-right text-tabular">{{formatBytes .Bytes}}</td>
+                <td class="text-right text-tabular">{{.AvgMs}} ms</td>
                 <td>{{sparklineSVG .Trend}}</td>
             </tr>
             <tr class="drilldown-row" style="display:none;"><td colspan="6"><div class="drilldown-content"></div></td></tr>
@@ -23,7 +23,10 @@
         </tbody>
     </table>
     {{else}}
-    <p style="color: var(--text-secondary);">No paths found for the selected period.</p>
+    <div class="empty-state" style="min-height: 120px; padding: 2rem;">
+        <div class="empty-state-title">No data available</div>
+        <div class="empty-state-description">Try adjusting the date range or filters.</div>
+    </div>
     {{end}}
 </div>
 
@@ -43,7 +46,10 @@
         {{end}}
     </div>
     {{else}}
-    <p style="color: var(--text-secondary);">No referrer data available.</p>
+    <div class="empty-state" style="min-height: 120px; padding: 2rem;">
+        <div class="empty-state-title">No data available</div>
+        <div class="empty-state-description">No referrer data available for this period.</div>
+    </div>
     {{end}}
 </div>
 
@@ -53,20 +59,23 @@
         <button class="btn btn-ghost" style="float:right; font-size: 0.8rem;" hx-get="/api/panel/not-found?page=1&limit=10" hx-target="#panel-not-found" hx-swap="innerHTML" hx-include="#filter-form">Paginated View</button>
     </h3>
     {{if .NotFoundPaths}}
-    <table>
-        <thead><tr><th>Path</th><th>Hits</th><th>Bytes</th></tr></thead>
+    <table class="table-striped table-hover">
+        <thead><tr><th>Path</th><th class="text-right">Hits</th><th class="text-right">Bytes</th></tr></thead>
         <tbody>
             {{range .NotFoundPaths}}
             <tr class="drilldown-trigger" hx-get="/api/drilldown/path?path={{.Path}}" hx-target="next .drilldown-row" hx-swap="innerHTML" hx-include="#filter-form">
                 <td>{{.Path}}</td>
-                <td>{{formatNumber .Count}}</td>
-                <td>{{formatBytes .Bytes}}</td>
+                <td class="text-right text-tabular">{{formatNumber .Count}}</td>
+                <td class="text-right text-tabular">{{formatBytes .Bytes}}</td>
             </tr>
             <tr class="drilldown-row" style="display:none;"><td colspan="3"><div class="drilldown-content"></div></td></tr>
             {{end}}
         </tbody>
     </table>
     {{else}}
-    <p style="color: var(--text-secondary);">No 404 paths found.</p>
+    <div class="empty-state" style="min-height: 120px; padding: 2rem;">
+        <div class="empty-state-title">No data available</div>
+        <div class="empty-state-description">No 404 paths found for this period.</div>
+    </div>
     {{end}}
 </div>

@@ -12,6 +12,8 @@
         {{end}}
         <div id="status-code-drilldown"></div>
     {{else}}
-    <p class="text-secondary">No status codes found for this class.</p>
+    <div class="empty-state" style="min-height: 80px; padding: 1rem;">
+        <div class="empty-state-description">No status codes found for this class.</div>
+    </div>
     {{end}}
 </div>

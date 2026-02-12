@@ -1,24 +1,27 @@
 <div class="card-header">Not Found (404)</div>
 {{if .Paths}}
-    <table>
+    <table class="table-striped table-hover">
         <thead>
             <tr>
                 <th>Path</th>
-                <th>Hits</th>
-                <th>Bytes</th>
+                <th class="text-right">Hits</th>
+                <th class="text-right">Bytes</th>
             </tr>
         </thead>
         <tbody>
             {{range .Paths}}
             <tr class="drilldown-trigger" hx-get="/api/drilldown/path?path={{.Path}}" hx-target="next .drilldown-row" hx-swap="innerHTML" hx-include="#filter-form">
                 <td>{{.Path}}</td>
-                <td>{{formatNumber .Count}}</td>
-                <td>{{formatBytes .Bytes}}</td>
+                <td class="text-right text-tabular">{{formatNumber .Count}}</td>
+                <td class="text-right text-tabular">{{formatBytes .Bytes}}</td>
             </tr>
             <tr class="drilldown-row" style="display:none;"><td colspan="3"><div class="drilldown"></div></td></tr>
             {{end}}
         </tbody>
     </table>
 {{else}}
-    <p class="text-secondary">No 404 paths found.</p>
+    <div class="empty-state" style="min-height: 120px; padding: 2rem;">
+        <div class="empty-state-title">No data available</div>
+        <div class="empty-state-description">No 404 paths found for this period.</div>
+    </div>
 {{end}}

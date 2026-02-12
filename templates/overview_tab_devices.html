@@ -4,7 +4,7 @@
     {{if .UserAgents}}
         <div>
             {{range .UserAgents}}
-            <div class="chart-row">
+            <div class="chart-row" data-tooltip="{{.Category}}: {{formatNumber .Count}} ({{formatPct .Pct}})">
                 <div class="chart-row-label">{{.Category}}</div>
                 <div class="chart-row-track">
                     <div class="chart-row-fill" style="width: {{pct .Count $.MaxUserAgent}}%;"></div>
@@ -14,7 +14,10 @@
             {{end}}
         </div>
     {{else}}
-        <p class="text-secondary">No user agent data available.</p>
+        <div class="empty-state" style="min-height: 120px; padding: 2rem;">
+            <div class="empty-state-title">No data available</div>
+            <div class="empty-state-description">Try adjusting the date range or filters.</div>
+        </div>
     {{end}}
 </div>
 
@@ -24,7 +27,7 @@
     {{if .Browsers}}
         <div>
             {{range .Browsers}}
-            <div class="chart-row">
+            <div class="chart-row" data-tooltip="{{.Browser}}: {{formatNumber .Count}} ({{formatPct .Pct}})">
                 <div class="chart-row-label">{{.Browser}}</div>
                 <div class="chart-row-track">
                     <div class="chart-row-fill" style="width: {{pct .Count $.MaxBrowser}}%;"></div>
@@ -34,7 +37,10 @@
             {{end}}
         </div>
     {{else}}
-        <p class="text-secondary">No browser data available.</p>
+        <div class="empty-state" style="min-height: 120px; padding: 2rem;">
+            <div class="empty-state-title">No data available</div>
+            <div class="empty-state-description">Try adjusting the date range or filters.</div>
+        </div>
     {{end}}
 </div>
 
@@ -44,7 +50,7 @@
     {{if .OSStats}}
         <div>
             {{range .OSStats}}
-            <div class="chart-row">
+            <div class="chart-row" data-tooltip="{{.OS}}: {{formatNumber .Count}} ({{formatPct .Pct}})">
                 <div class="chart-row-label">{{.OS}}</div>
                 <div class="chart-row-track">
                     <div class="chart-row-fill" style="width: {{pct .Count $.MaxOS}}%;"></div>
@@ -60,7 +66,10 @@
         </div>
         {{end}}
     {{else}}
-        <p class="text-secondary">No OS data available.</p>
+        <div class="empty-state" style="min-height: 120px; padding: 2rem;">
+            <div class="empty-state-title">No data available</div>
+            <div class="empty-state-description">Try adjusting the date range or filters.</div>
+        </div>
     {{end}}
 </div>
 
@@ -71,7 +80,7 @@
     {{if .Countries}}
         <div>
             {{range .Countries}}
-            <div class="chart-row">
+            <div class="chart-row" data-tooltip="{{.Country}}: {{formatNumber .Count}} ({{formatPct .Pct}})">
                 <div class="chart-row-label">{{.Country}}</div>
                 <div class="chart-row-track">
                     <div class="chart-row-fill" style="width: {{pct .Count $.MaxCountry}}%;"></div>
@@ -81,7 +90,10 @@
             {{end}}
         </div>
     {{else}}
-        <p class="text-secondary">No country data available.</p>
+        <div class="empty-state" style="min-height: 120px; padding: 2rem;">
+            <div class="empty-state-title">No data available</div>
+            <div class="empty-state-description">Try adjusting the date range or filters.</div>
+        </div>
     {{end}}
 </div>
 {{end}}

@@ -233,6 +233,27 @@
     flex-wrap: wrap;
 }
 
+.filter-bar input[type="date"],
+.filter-bar select {
+    padding: 6px 14px;
+    font-size: 13px;
+    line-height: 1.2;
+    background-color: var(--surface-2);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    width: auto;
+}
+
+.filter-bar label {
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.filter-bar input[type="checkbox"] {
+    margin: 0;
+}
+
 .filter-btn {
     background-color: var(--surface-2);
     color: var(--text-secondary);
@@ -268,8 +289,8 @@
 /* --- Stats Cards Layout --- */
 .stats-row {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 0.75rem;
     margin-bottom: 1rem;
 }
 
@@ -277,7 +298,7 @@
     background: var(--surface-1);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
-    padding: 1rem 1.25rem;
+    padding: 0.75rem 1rem;
     text-align: center;
 }
 
@@ -296,7 +317,7 @@
 }
 
 .stat-value {
-    font-size: 32px;
+    font-size: 24px;
     font-weight: 600;
     color: var(--brand);
     display: block;
@@ -312,6 +333,98 @@
     font-weight: 500;
 }
 
+.stat-delta {
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    margin-bottom: 2px;
+}
+
+.delta-up {
+    color: var(--success);
+}
+
+.delta-down {
+    color: var(--error);
+}
+
+.delta-neutral {
+    color: var(--text-muted);
+}
+
+
+/* --- Utility Classes --- */
+.text-right {
+    text-align: right;
+}
+
+.text-tabular {
+    font-variant-numeric: tabular-nums;
+}
+
+
+/* --- Loading Bar --- */
+.loading-bar {
+    position: relative;
+}
+
+.loading-bar .htmx-indicator {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--brand);
+    animation: loading-slide 1.2s ease-in-out infinite;
+    display: none;
+}
+
+.htmx-request .htmx-indicator.loading-bar-indicator {
+    display: block;
+}
+
+@keyframes loading-slide {
+    0% { transform: translateX(-100%); }
+    50% { transform: translateX(0%); }
+    100% { transform: translateX(100%); }
+}
+
+
+/* Chart elements with tooltips should use default cursor */
+.timeseries-col[data-tooltip],
+.hour-bar[data-tooltip],
+.chart-row[data-tooltip] {
+    cursor: default;
+}
+
+/* For chart columns, position tooltip below to avoid overflow */
+.timeseries-col[data-tooltip]::after {
+    bottom: auto;
+    top: calc(100% + 8px);
+}
+.timeseries-col[data-tooltip]::before {
+    bottom: auto;
+    top: calc(100% + 2px);
+    border-top: none;
+    border-bottom: 6px solid var(--surface-1);
+}
+[data-theme="dark"] .timeseries-col[data-tooltip]::before {
+    border-bottom-color: var(--surface-3);
+}
+
+
+/* --- Last Updated Timestamp --- */
+.last-updated {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-align: right;
+    padding: 4px 0;
+}
+
+
+/* --- Sidebar Width Override --- */
+:root {
+    --sidebar-width: 180px;
+}
 
 /* --- Sidebar Footer (Theme Toggle Placement) --- */
 .sidebar-footer {

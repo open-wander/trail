@@ -2,13 +2,13 @@
     <div class="drilldown-header">Status {{.Code}} - Top Paths</div>
     {{if .Paths}}
         <div class="overflow-x-auto">
-            <table>
+            <table class="table-striped table-hover">
                 <thead>
                     <tr>
                         <th>Path</th>
-                        <th>Requests</th>
-                        <th>Bytes</th>
-                        <th>Avg Ms</th>
+                        <th class="text-right">Requests</th>
+                        <th class="text-right">Bytes</th>
+                        <th class="text-right">Avg Ms</th>
                         <th>Also Returns</th>
                     </tr>
                 </thead>
@@ -16,9 +16,9 @@
                     {{range .Paths}}
                     <tr>
                         <td><code>{{.Path}}</code></td>
-                        <td>{{formatNumber .Count}}</td>
-                        <td>{{formatBytes .Bytes}}</td>
-                        <td>{{.AvgMs}} ms</td>
+                        <td class="text-right text-tabular">{{formatNumber .Count}}</td>
+                        <td class="text-right text-tabular">{{formatBytes .Bytes}}</td>
+                        <td class="text-right text-tabular">{{.AvgMs}} ms</td>
                         <td>
                             {{range .AltStatuses}}
                             <span class="method-badge" style="color: {{statusCodeColor .Status}}; border-color: {{statusCodeColor .Status}};">{{.Status}} ({{formatNumber .Count}})</span>
@@ -30,7 +30,9 @@
             </table>
         </div>
     {{else}}
-        <p class="text-secondary">No paths found for this status code.</p>
+        <div class="empty-state" style="min-height: 80px; padding: 1rem;">
+            <div class="empty-state-description">No paths found for this status code.</div>
+        </div>
     {{end}}
 
     {{if .Methods}}

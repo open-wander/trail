@@ -64,6 +64,9 @@ func New(cfg *config.Config, database *sql.DB, templatesFS, staticFS fs.FS) *Ser
 		"formatDate":      formatDate,
 		"conicGradient":   conicGradient,
 		"sparklineSVG":    sparklineSVG,
+		"formatDelta":     formatDelta,
+		"deltaClass":      deltaClass,
+		"deltaArrow":      deltaArrow,
 	}
 
 	// Parse overview templates (layout + overview + tab partials)
@@ -386,6 +389,39 @@ func conicGradient(segments []DonutSegment) string {
 		parts = append(parts, fmt.Sprintf("%s %.1f%% %.1f%%", s.Color, s.Start, s.End))
 	}
 	return "conic-gradient(" + strings.Join(parts, ", ") + ")"
+}
+
+// formatDelta formats a percentage delta as "+12.5%" or "-3.2%"
+func formatDelta(d float64) string {
+	if d > 0 {
+		return fmt.Sprintf("+%.1f%%", d)
+	}
+	if d < 0 {
+		return fmt.Sprintf("%.1f%%", d)
+	}
+	return "0.0%"
+}
+
+// deltaClass returns a CSS class name based on the delta direction
+func deltaClass(d float64) string {
+	if d > 0.5 {
+		return "delta-up"
+	}
+	if d < -0.5 {
+		return "delta-down"
+	}
+	return "delta-neutral"
+}
+
+// deltaArrow returns a unicode arrow based on the delta direction
+func deltaArrow(d float64) string {
+	if d > 0.5 {
+		return "\u2191" // up arrow
+	}
+	if d < -0.5 {
+		return "\u2193" // down arrow
+	}
+	return "\u2192" // right arrow (neutral)
 }
 
 // sparklineSVG generates an inline SVG sparkline from data points

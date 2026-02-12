@@ -3,7 +3,7 @@
     {{if .StatusCodes}}
     <div class="chart-horizontal">
         {{range .StatusCodes}}
-        <div class="chart-row drilldown-trigger" hx-get="/api/drilldown/status?class={{.Class}}" hx-target="#status-drilldown" hx-swap="innerHTML" hx-include="#filter-form">
+        <div class="chart-row drilldown-trigger" hx-get="/api/drilldown/status?class={{.Class}}" hx-target="#status-drilldown" hx-swap="innerHTML" hx-include="#filter-form" data-tooltip="{{.Class}}: {{formatNumber .Count}}">
             <div class="chart-row-label">{{.Class}}</div>
             <div class="chart-row-track">
                 <div class="chart-row-fill" style="width: {{pct .Count $.MaxStatus}}%; background: {{statusColor .Class}};"></div>
@@ -14,7 +14,10 @@
     </div>
     <div id="status-drilldown"></div>
     {{else}}
-    <p style="color: var(--text-secondary);">No status data available.</p>
+    <div class="empty-state" style="min-height: 120px; padding: 2rem;">
+        <div class="empty-state-title">No data available</div>
+        <div class="empty-state-description">Try adjusting the date range or filters.</div>
+    </div>
     {{end}}
 </div>
 
@@ -23,7 +26,7 @@
     {{if .StatusDetails}}
     <div class="chart-horizontal">
         {{range .StatusDetails}}
-        <div class="chart-row drilldown-trigger" hx-get="/api/drilldown/status-code?code={{.Status}}" hx-target="#status-code-drilldown" hx-swap="innerHTML" hx-include="#filter-form">
+        <div class="chart-row drilldown-trigger" hx-get="/api/drilldown/status-code?code={{.Status}}" hx-target="#status-code-drilldown" hx-swap="innerHTML" hx-include="#filter-form" data-tooltip="{{.Status}}: {{formatNumber .Count}} ({{formatPct .Pct}})">
             <div class="chart-row-label">{{.Status}}</div>
             <div class="chart-row-track">
                 <div class="chart-row-fill" style="width: {{pct .Count $.MaxStatusDet}}%; background: {{statusCodeColor .Status}};"></div>
@@ -34,7 +37,10 @@
     </div>
     <div id="status-code-drilldown"></div>
     {{else}}
-    <p style="color: var(--text-secondary);">No status code data available.</p>
+    <div class="empty-state" style="min-height: 120px; padding: 2rem;">
+        <div class="empty-state-title">No data available</div>
+        <div class="empty-state-description">Try adjusting the date range or filters.</div>
+    </div>
     {{end}}
 </div>
 
@@ -43,7 +49,7 @@
     {{if .Methods}}
     <div class="chart-horizontal">
         {{range .Methods}}
-        <div class="chart-row">
+        <div class="chart-row" data-tooltip="{{.Method}}: {{formatNumber .Count}} ({{formatPct .Pct}})">
             <div class="chart-row-label">{{.Method}}</div>
             <div class="chart-row-track">
                 <div class="chart-row-fill" style="width: {{pct .Count $.MaxMethod}}%;"></div>
@@ -53,6 +59,9 @@
         {{end}}
     </div>
     {{else}}
-    <p style="color: var(--text-secondary);">No method data available.</p>
+    <div class="empty-state" style="min-height: 120px; padding: 2rem;">
+        <div class="empty-state-title">No data available</div>
+        <div class="empty-state-description">Try adjusting the date range or filters.</div>
+    </div>
     {{end}}
 </div>

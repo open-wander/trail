@@ -32,9 +32,15 @@
 </div>
 
 <!-- Tab Content (swappable via htmx) -->
-<div id="sec-tab-content">
+<div id="sec-tab-content" class="loading-bar" hx-indicator=".sec-loading-indicator">
+    <div class="htmx-indicator loading-bar-indicator sec-loading-indicator"></div>
     {{template "security_tab_summary.html" .}}
 </div>
+<div class="last-updated" x-data="{ ago: '' }" x-init="
+    let ts = Date.now();
+    setInterval(() => { let s = Math.round((Date.now() - ts) / 1000); ago = s < 5 ? 'just now' : s + 's ago'; }, 1000);
+    document.body.addEventListener('htmx:afterSettle', (e) => { if (e.detail.target && e.detail.target.id === 'sec-tab-content') { ts = Date.now(); ago = 'just now'; } });
+" x-text="'Updated ' + ago"></div>
 
 <script>
 function switchSecTab(btn, tab) {

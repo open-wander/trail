@@ -40,6 +40,66 @@ func computeDonutPositions(segments []DonutSegment) {
 	}
 }
 
+// ComparisonStat holds current vs previous period stats with precomputed deltas
+type ComparisonStat struct {
+	Current       *TotalStat
+	Previous      *TotalStat
+	RequestsDelta float64
+	VisitorsDelta float64
+	BytesDelta    float64
+	AvgMsDelta    float64
+}
+
+// computeComparison calculates percentage change between current and previous stats
+func computeComparison(current, previous *TotalStat) *ComparisonStat {
+	c := &ComparisonStat{
+		Current:  current,
+		Previous: previous,
+	}
+	if previous == nil || current == nil {
+		return c
+	}
+	c.RequestsDelta = pctChange(current.Requests, previous.Requests)
+	c.VisitorsDelta = pctChange(current.Visitors, previous.Visitors)
+	c.BytesDelta = pctChange(current.Bytes, previous.Bytes)
+	c.AvgMsDelta = pctChange(current.AvgMs, previous.AvgMs)
+	return c
+}
+
+// pctChange returns the percentage change from old to new value.
+// Returns 0 when old is 0 to avoid division by zero.
+func pctChange(newVal, oldVal int64) float64 {
+	if oldVal == 0 {
+		if newVal > 0 {
+			return 100.0
+		}
+		return 0.0
+	}
+	return float64(newVal-oldVal) / float64(oldVal) * 100.0
+}
+
+// previousPeriodFilter shifts the filter to the equivalent previous period.
+// "today" -> yesterday, "7d" -> previous 7 days, "30d" -> previous 30 days,
+// "custom" -> same duration before custom_from.
+func previousPeriodFilter(f Filter, rangeParam string) Filter {
+	from, errFrom := time.Parse(time.RFC3339, f.From)
+	to, errTo := time.Parse(time.RFC3339, f.To)
+	if errFrom != nil || errTo != nil {
+		return f
+	}
+
+	duration := to.Sub(from)
+	prevTo := from
+	prevFrom := prevTo.Add(-duration)
+
+	return Filter{
+		From:        prevFrom.Format(time.RFC3339),
+		To:          prevTo.Format(time.RFC3339),
+		Router:      f.Router,
+		IncludeBots: f.IncludeBots,
+	}
+}
+
 // OverviewData represents the data for the overview template
 type OverviewData struct {
 	Stats         *TotalStat
@@ -96,6 +156,7 @@ type OverviewData struct {
 	MaxBandwidth      int64
 	MaxResponseTime   int64
 	ActiveTab         string
+	Comparison        *ComparisonStat
 }
 
 // SecurityData represents the data for the security template
@@ -220,6 +281,15 @@ func (s *Server) getOverviewData(c *fiber.Ctx) (*OverviewData, error) {
 		return nil, fmt.Errorf("failed to fetch total stats: %w", err)
 	}
 	log.Printf("Overview: total stats loaded (requests=%d visitors=%d)", stats.Requests, stats.Visitors)
+
+	// Compute previous period comparison
+	prevFilter := previousPeriodFilter(filter, rangeParam)
+	prevStats, err := s.queries.TotalStats(prevFilter)
+	if err != nil {
+		log.Printf("Warning: failed to fetch previous period stats: %v", err)
+		prevStats = nil
+	}
+	comparison := computeComparison(stats, prevStats)
 
 	// Use daily rollup for multi-day ranges, hourly for today
 	useDaily := rangeParam == "7d" || rangeParam == "30d" || rangeParam == "custom"
@@ -634,6 +704,7 @@ func (s *Server) getOverviewData(c *fiber.Ctx) (*OverviewData, error) {
 		MaxDurationHist:   maxDurationHist,
 		MaxBandwidth:      maxBandwidth,
 		MaxResponseTime:   maxResponseTime,
+		Comparison:        comparison,
 	}, nil
 }
 

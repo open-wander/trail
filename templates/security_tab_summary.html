@@ -23,7 +23,7 @@
     <div class="card-header">Threat Pattern Classification</div>
     {{if .ThreatPatterns}}
         {{range .ThreatPatterns}}
-        <div class="chart-row">
+        <div class="chart-row" data-tooltip="{{.Category}}: {{formatNumber .Count}} ({{formatPct .Pct}})">
             <span class="chart-row-label">{{.Category}}</span>
             <div class="chart-row-track">
                 <div class="chart-row-fill" style="width: {{pct .Count $.MaxThreat}}%; background: var(--error);"></div>
@@ -35,7 +35,10 @@
         </div>
         {{end}}
     {{else}}
-        <p class="text-secondary">No unrouted traffic in this period.</p>
+        <div class="empty-state" style="min-height: 120px; padding: 2rem;">
+            <div class="empty-state-title">No data available</div>
+            <div class="empty-state-description">No unrouted traffic in this period.</div>
+        </div>
     {{end}}
 </div>
 
@@ -74,6 +77,9 @@
         </div>
         {{end}}
     {{else}}
-        <p class="text-secondary">No traffic data available.</p>
+        <div class="empty-state" style="min-height: 120px; padding: 2rem;">
+            <div class="empty-state-title">No data available</div>
+            <div class="empty-state-description">No traffic data available for this period.</div>
+        </div>
     {{end}}
 </div>

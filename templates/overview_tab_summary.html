@@ -2,44 +2,24 @@
 <div class="stats-row">
     <div class="stat-card">
         <div class="stat-value">{{formatNumber .Stats.Requests}}</div>
+        {{if .Comparison}}<div class="stat-delta {{deltaClass .Comparison.RequestsDelta}}">{{deltaArrow .Comparison.RequestsDelta}} {{formatDelta .Comparison.RequestsDelta}}</div>{{end}}
         <div class="stat-label">Total Requests</div>
     </div>
     <div class="stat-card">
         <div class="stat-value">{{formatNumber .Stats.Visitors}}</div>
+        {{if .Comparison}}<div class="stat-delta {{deltaClass .Comparison.VisitorsDelta}}">{{deltaArrow .Comparison.VisitorsDelta}} {{formatDelta .Comparison.VisitorsDelta}}</div>{{end}}
         <div class="stat-label">Unique Visitors</div>
     </div>
     <div class="stat-card">
         <div class="stat-value">{{formatBytes .Stats.Bytes}}</div>
+        {{if .Comparison}}<div class="stat-delta {{deltaClass .Comparison.BytesDelta}}">{{deltaArrow .Comparison.BytesDelta}} {{formatDelta .Comparison.BytesDelta}}</div>{{end}}
         <div class="stat-label">Bandwidth</div>
     </div>
-    {{if .Percentiles}}
     <div class="stat-card">
-        <div class="stat-value">{{.Percentiles.P50}} ms</div>
-        <div class="stat-label">Median Response</div>
+        <div class="stat-value">{{.Stats.AvgMs}} ms</div>
+        {{if .Comparison}}<div class="stat-delta {{deltaClass .Comparison.AvgMsDelta}}">{{deltaArrow .Comparison.AvgMsDelta}} {{formatDelta .Comparison.AvgMsDelta}}</div>{{end}}
+        <div class="stat-label">Avg Response Time</div>
     </div>
-    {{end}}
-    {{if .MobilePct}}
-    <div class="stat-card">
-        <div class="stat-value">{{formatPct .MobilePct}}</div>
-        <div class="stat-label">Mobile Traffic</div>
-    </div>
-    {{end}}
-    {{if .DesktopPct}}
-    <div class="stat-card">
-        <div class="stat-value">{{formatPct .DesktopPct}}</div>
-        <div class="stat-label">Desktop Traffic</div>
-    </div>
-    {{end}}
-    {{if .Percentiles}}
-    <div class="stat-card">
-        <div class="stat-value">{{.Percentiles.P95}} ms</div>
-        <div class="stat-label">95th Percentile</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-value">{{.Percentiles.P99}} ms</div>
-        <div class="stat-label">99th Percentile</div>
-    </div>
-    {{end}}
 </div>
 {{end}}
 
@@ -48,7 +28,7 @@
     <h3>Requests / Visitors</h3>
     <div class="timeseries-chart">
         {{range $i, $point := .RequestsChart}}
-        <div class="timeseries-col">
+        <div class="timeseries-col" data-tooltip="{{formatTimeLabel .Label}}: {{formatNumber .Count}} requests">
             <div class="timeseries-value">{{formatNumber .Count}}</div>
             <div class="timeseries-bars" style="height: {{pct .Count $.MaxRequests}}%;">
                 <div class="timeseries-bar-hits" style="height: 100%;"></div>
@@ -66,6 +46,9 @@
 {{else}}
 <div class="card">
     <h3>Requests / Visitors</h3>
-    <p style="color: var(--text-secondary);">No data available for the selected period.</p>
+    <div class="empty-state" style="min-height: 160px; padding: 2rem;">
+        <div class="empty-state-title">No data available</div>
+        <div class="empty-state-description">Try adjusting the date range or filters.</div>
+    </div>
 </div>
 {{end}}
