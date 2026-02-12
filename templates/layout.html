@@ -10,7 +10,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Trail - Analytics</title>
-    <link rel="stylesheet" href="/static/css/pico.min.css">
     <link rel="stylesheet" href="/static/css/components.css">
     <link rel="stylesheet" href="/static/css/trail.css">
     <script src="/static/htmx.min.js"></script>
@@ -20,7 +19,7 @@
     <div class="layout-sidebar">
         <aside class="sidebar">
             <div class="sidebar-header">
-                <h2>Trail</h2>
+                <a href="/" style="text-decoration: none; color: inherit;"><h2>Trail</h2></a>
             </div>
             <nav class="sidebar-nav">
                 <a href="/" class="sidebar-nav-item {{if eq .Page "overview"}}sidebar-nav-item-active{{end}}">Overview</a>
