@@ -22,3 +22,7 @@ tmp/
 
 # OS
 .DS_Store
+
+# Task/loop state
+.loop/
+tasks/
