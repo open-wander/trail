@@ -35,8 +35,15 @@
     gap: 2px;
     height: 200px;
     padding-top: 10px;
-    overflow-x: auto;
+    overflow-x: hidden; /* hide any overflow so page doesn’t scroll */
     width: 100%;
+    box-sizing: border-box;
+}
+
+/* ensure chart columns can shrink if necessary */
+.timeseries-col {
+    flex-shrink: 1;
+    min-width: 0;
 }
 
 .timeseries-col {
@@ -425,6 +432,16 @@
 /* --- Sidebar Width Override --- */
 :root {
     --sidebar-width: 180px;
+}
+
+/* Add right-side padding so layout doesn't hug the viewport edge */
+.layout-content {
+    padding-right: 1rem;
+}
+
+body {
+    /* ensure a little breathing room on the right side */
+    padding-right: 0.5rem;
 }
 
 /* --- Sidebar Footer (Theme Toggle Placement) --- */
