@@ -193,7 +193,7 @@ docker run -d --name trail \
 - Response time histogram (6 buckets from 0-10ms to 1000+ms)
 - Bandwidth over time
 - Response time trend over time
-- 404 paths (clickable drilldown)
+- 404 paths (clickable drilldown) with automatic redirect suggestions for common bot probes.  Each suggestion has buttons to copy Apache/.htaccess or Traefik snippets.
 - Hour-of-day distribution (requests + visitors overlay)
 
 ### Security (/security)

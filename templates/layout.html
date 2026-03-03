@@ -52,6 +52,13 @@ function updateThemeLabel(theme) {
     if (el) el.textContent = theme === 'dark' ? 'Dark' : 'Light';
 }
 updateThemeLabel(document.documentElement.getAttribute('data-theme'));
+
+function copyText(text) {
+    if (!text) return;
+    navigator.clipboard.writeText(text).catch(function(err){
+        console.error('clipboard write failed', err);
+    });
+}
 </script>
 </body>
 </html>

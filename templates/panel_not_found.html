@@ -6,6 +6,7 @@
                 <th>Path</th>
                 <th class="text-right">Hits</th>
                 <th class="text-right">Bytes</th>
+                <th>Suggestion</th>
             </tr>
         </thead>
         <tbody>
@@ -14,8 +15,15 @@
                 <td>{{.Path}}</td>
                 <td class="text-right text-tabular">{{formatNumber .Count}}</td>
                 <td class="text-right text-tabular">{{formatBytes .Bytes}}</td>
+                <td>{{if .Suggestion}}
+                    <div class="suggestion-block">
+                        <code id="apache-{{.Path}}">{{.Suggestion}}</code>
+                        <button class="btn btn-xs" onclick="copyText(this.dataset.text)" data-text="{{.Suggestion}}">Apache</button>
+                        <button class="btn btn-xs" onclick="copyText(this.dataset.text)" data-text="{{.TraefikSuggestion}}">Traefik</button>
+                    </div>
+                {{end}}</td>
             </tr>
-            <tr class="drilldown-row" style="display:none;"><td colspan="3"><div class="drilldown"></div></td></tr>
+            <tr class="drilldown-row" style="display:none;"><td colspan="4"><div class="drilldown"></div></td></tr>
             {{end}}
         </tbody>
     </table>

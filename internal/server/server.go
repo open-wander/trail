@@ -11,6 +11,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/basicauth"
@@ -314,6 +315,81 @@ func pct(value, max int64) int {
 		return 1
 	}
 	return result
+}
+
+// generateRedirectSuggestion returns a simple redirect rule for known
+// bot/scanner paths that commonly trigger 404s (e.g. WordPress probes).
+// If the path isn't recognised we return an empty string.
+func generateRedirectSuggestion(path string) string {
+	// sanity: suggestions are only meaningful for absolute paths
+	if path == "" || path[0] != '/' {
+		return ""
+	}
+	lower := strings.ToLower(path)
+	// list of patterns we care about; they could be extended in future
+	if strings.HasPrefix(lower, "/wp-") ||
+		lower == "/xmlrpc.php" ||
+		lower == "/.env" ||
+		lower == "/admin" ||
+		lower == "/setup-config.php" {
+		return fmt.Sprintf("Redirect 301 %s /", path)
+	}
+	return ""
+}
+
+// generateTraefikSnippet returns a tiny Traefik YAML redirectRegex snippet
+// for the same paths. This is shown alongside the Apache rule in the UI.
+func generateTraefikSnippet(path string) string {
+	if path == "" || path[0] != '/' {
+		return ""
+	}
+	lower := strings.ToLower(path)
+	if strings.HasPrefix(lower, "/wp-") ||
+		lower == "/xmlrpc.php" ||
+		lower == "/.env" ||
+		lower == "/admin" ||
+		lower == "/setup-config.php" {
+		// simple single-rule snippet; real users can adjust names as needed
+		return fmt.Sprintf("middlewares:\n  redirect_%s:\n    redirectRegex:\n      regex: \"^%s$\"\n      replacement: \"/\"\n      permanent: true",
+			escapeForName(path), path)
+	}
+	return ""
+}
+
+// escapeForName converts a path into a safe identifier fragment for YAML
+func escapeForName(path string) string {
+	// lowercase and build character-by-character; drop leading slash but
+	// convert any other slash to underscore. allow hyphen and dot.
+	var b []rune
+	for i, c := range path {
+		if i == 0 && c == '/' {
+			continue
+		}
+		c = unicode.ToLower(c)
+		if c == '/' {
+			b = append(b, '_')
+		} else if (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' {
+			b = append(b, c)
+		} else {
+			// everything else (including dot) becomes underscore
+			b = append(b, '_')
+		}
+	}
+	if len(b) == 0 {
+		return "root"
+	}
+	return string(b)
+}
+
+// applyRedirectSuggestions walks a slice of PathStat and populates the
+// Suggestion field by calling generateRedirectSuggestion. It mutates the
+// slice in place.
+func applyRedirectSuggestions(paths []PathStat) {
+	for i := range paths {
+		p := &paths[i]
+		p.Suggestion = generateRedirectSuggestion(p.Path)
+		p.TraefikSuggestion = generateTraefikSnippet(p.Path)
+	}
 }
 
 // statusColor returns CSS color variable for status code class

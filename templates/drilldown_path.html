@@ -1,5 +1,15 @@
 <div class="drilldown-content">
     <div class="drilldown-header">Breakdown for {{.Path}}</div>
+    {{if .Suggestion}}
+    <div class="alert alert-info" style="margin-bottom: 0.5rem;">
+        Suggested redirect:
+        <code>{{.Suggestion}}</code>
+        <button class="btn btn-xs" onclick="copyText(this.dataset.text)" data-text="{{.Suggestion}}">Apache</button>
+        <br>
+        <code>{{.TraefikSuggestion}}</code>
+        <button class="btn btn-xs" onclick="copyText(this.dataset.text)" data-text="{{.TraefikSuggestion}}">Traefik</button>
+    </div>
+    {{end}}
     {{if .Details}}
     <table class="table-striped table-hover">
         <thead>

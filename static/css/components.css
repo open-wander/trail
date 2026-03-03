@@ -249,8 +249,15 @@ th {
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-lg);
     padding: 1.8rem;
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--shadow-md); /* slightly stronger shadow by default */
     transition: all var(--duration) var(--ease-out);
+    position: relative; /* ensure shadow sits above sidebar */
+    z-index: 1;
+}
+.card:hover {
+    border-color: var(--border-hover);
+    box-shadow: var(--shadow-lg); /* deeper lift on hover */
+    transform: translateY(-2px);
 }
 .card:hover {
     border-color: var(--border-hover);

@@ -97,3 +97,45 @@ func TestStatusColor(t *testing.T) {
 		})
 	}
 }
+
+func TestGenerateRedirectSuggestion(t *testing.T) {
+	tests := []struct {
+		path        string
+		wantApache  string
+		wantTraefik string
+	}{
+		{"/wp-login.php", "Redirect 301 /wp-login.php /", "middlewares:\n  redirect_wp-login_php:\n    redirectRegex:\n      regex: \"^/wp-login.php$\"\n      replacement: \"/\"\n      permanent: true"},
+		{"/wp-admin/setup-config.php", "Redirect 301 /wp-admin/setup-config.php /", "middlewares:\n  redirect_wp-admin_setup-config_php:\n    redirectRegex:\n      regex: \"^/wp-admin/setup-config.php$\"\n      replacement: \"/\"\n      permanent: true"},
+		{"/.env", "Redirect 301 /.env /", "middlewares:\n  redirect__env:\n    redirectRegex:\n      regex: \"^/.env$\"\n      replacement: \"/\"\n      permanent: true"},
+		{"/foo", "", ""},
+		{"/XMLRPC.php", "Redirect 301 /XMLRPC.php /", "middlewares:\n  redirect_xmlrpc_php:\n    redirectRegex:\n      regex: \"^/XMLRPC.php$\"\n      replacement: \"/\"\n      permanent: true"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			if got := generateRedirectSuggestion(tt.path); got != tt.wantApache {
+				t.Errorf("generateRedirectSuggestion(%q) = %q, want %q", tt.path, got, tt.wantApache)
+			}
+			if got := generateTraefikSnippet(tt.path); got != tt.wantTraefik {
+				t.Errorf("generateTraefikSnippet(%q) = %q, want %q", tt.path, got, tt.wantTraefik)
+			}
+		})
+	}
+}
+
+func TestApplyRedirectSuggestions(t *testing.T) {
+	paths := []PathStat{{Path: "/wp-login.php"}, {Path: "/foo"}}
+	applyRedirectSuggestions(paths)
+	if paths[0].Suggestion == "" {
+		t.Errorf("expected suggestion for %s", paths[0].Path)
+	}
+	if paths[0].TraefikSuggestion == "" {
+		t.Errorf("expected Traefik suggestion for %s", paths[0].Path)
+	}
+	if paths[1].Suggestion != "" {
+		t.Errorf("unexpected suggestion for %s", paths[1].Path)
+	}
+	if paths[1].TraefikSuggestion != "" {
+		t.Errorf("unexpected Traefik suggestion for %s", paths[1].Path)
+	}
+}

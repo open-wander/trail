@@ -333,6 +333,8 @@ func (s *Server) getOverviewData(c *fiber.Ctx) (*OverviewData, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch 404 paths: %w", err)
 	}
+	// enrich 404 results with any redirect suggestions we can offer
+	applyRedirectSuggestions(notFoundPaths)
 
 	userAgents, err := s.queries.UserAgentBreakdown(filter)
 	if err != nil {
@@ -716,8 +718,9 @@ func (s *Server) handleLogout(c *fiber.Ctx) error {
 
 // DrilldownPathData represents data for the path drilldown partial
 type DrilldownPathData struct {
-	Path    string
-	Details []PathDetail
+	Path       string
+	Details    []PathDetail
+	Suggestion string // optional redirect hint for suspicious 404 paths
 }
 
 // DrilldownStatusData represents data for the status drilldown partial
@@ -744,9 +747,11 @@ func (s *Server) handlePathDrilldown(c *fiber.Ctx) error {
 		return c.Status(500).SendString("Error loading drilldown")
 	}
 
+	suggestion := generateRedirectSuggestion(path)
 	data := DrilldownPathData{
-		Path:    path,
-		Details: details,
+		Path:       path,
+		Details:    details,
+		Suggestion: suggestion,
 	}
 
 	var buf bytes.Buffer
@@ -1030,6 +1035,7 @@ func (s *Server) handlePanelNotFound(c *fiber.Ctx) error {
 		log.Printf("Error fetching 404 paths: %v", err)
 		return c.Status(500).SendString("Error loading 404 paths")
 	}
+	applyRedirectSuggestions(notFound)
 
 	data := PanelNotFoundData{
 		Paths:       notFound,

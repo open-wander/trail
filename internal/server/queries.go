@@ -32,12 +32,14 @@ type TimeSeriesPoint struct {
 
 // PathStat represents statistics for a single path
 type PathStat struct {
-	Path  string
-	Count int64
-	AvgMs int64 // average duration
-	Bytes int64
-	Pct   float64
-	Trend []int64 // daily request counts for sparkline
+	Path              string
+	Count             int64
+	AvgMs             int64 // average duration
+	Bytes             int64
+	Pct               float64
+	Trend             []int64 // daily request counts for sparkline
+	Suggestion        string  // optional redirect hint for suspicious 404 paths
+	TraefikSuggestion string  // optional Traefik redirect snippet
 }
 
 // UserAgentStat represents statistics for a user agent category
@@ -1666,12 +1668,12 @@ func (q *Queries) DurationPercentiles(f Filter) (*PercentileResult, error) {
 
 	// Bucket midpoints in ms (ordered by bucket)
 	midpoints := map[string]int64{
-		"0-10ms":    5,
-		"10-50ms":   30,
-		"50-100ms":  75,
-		"100-500ms": 300,
+		"0-10ms":     5,
+		"10-50ms":    30,
+		"50-100ms":   75,
+		"100-500ms":  300,
 		"500-1000ms": 750,
-		"1000+ms":   2000,
+		"1000+ms":    2000,
 	}
 
 	// Build cumulative distribution
