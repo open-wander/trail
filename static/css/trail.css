@@ -434,14 +434,25 @@
     --sidebar-width: 180px;
 }
 
-/* Add right-side padding so layout doesn't hug the viewport edge */
+/* Add horizontal padding so layout doesn't hug the viewport edge */
 .layout-content {
+    padding-left: 1rem;
     padding-right: 1rem;
 }
 
 body {
-    /* ensure a little breathing room on the right side */
+    /* ensure a little breathing room on both sides */
+    padding-left: 0.5rem;
     padding-right: 0.5rem;
+}
+
+/* add a subtle divider between sidebar and main content */
+.layout-sidebar .sidebar {
+    border-right: 1px solid var(--border-subtle);
+}
+.layout-content {
+    /* ensure content doesn’t overlap sidebar shadow */
+    padding-left: 1.25rem;
 }
 
 /* --- Sidebar Footer (Theme Toggle Placement) --- */
