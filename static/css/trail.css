@@ -36,6 +36,7 @@
     height: 200px;
     padding-top: 10px;
     overflow-x: auto;
+    width: 100%;
 }
 
 .timeseries-col {
@@ -124,7 +125,7 @@
 .hour-chart {
     display: flex;
     align-items: flex-end;
-    gap: 3px;
+    gap: 6px;
     height: 150px;
     padding-top: 10px;
 }
@@ -291,7 +292,7 @@
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
     gap: 0.75rem;
-    margin-bottom: 1rem;
+    margin-bottom: 2rem;
 }
 
 .stats-row .stat-card {

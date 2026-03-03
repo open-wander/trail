@@ -250,6 +250,9 @@ func (s *Server) setupRoutes() {
 	s.app.Get("/api/panel/paths", s.handlePanelPaths)
 	s.app.Get("/api/panel/referrers", s.handlePanelReferrers)
 	s.app.Get("/api/panel/not-found", s.handlePanelNotFound)
+
+	// Logout endpoint
+	s.app.Get("/logout", s.handleLogout)
 }
 
 // Start begins listening for HTTP requests

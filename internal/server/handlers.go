@@ -653,37 +653,37 @@ func (s *Server) getOverviewData(c *fiber.Ctx) (*OverviewData, error) {
 	}
 
 	return &OverviewData{
-		Stats:           stats,
-		RequestsChart:   requestsChart,
-		VisitorsChart:   visitorsChart,
-		TopPaths:        topPaths,
-		StatusCodes:     statusCodes,
-		TopReferrers:    referrers,
-		NotFoundPaths:   notFoundPaths,
-		UserAgents:      userAgents,
-		Methods:         methods,
-		StatusDetails:   statusDetails,
-		HourOfDay:       hourOfDay,
-		MaxRequests:     maxRequests,
-		MaxVisitors:     maxVisitors,
-		MaxStatus:       maxStatus,
-		MaxNotFound:     maxNotFound,
-		MaxUserAgent:    maxUserAgent,
-		MaxMethod:       maxMethod,
-		MaxStatusDet:    maxStatusDet,
-		MaxHourOfDay:    maxHourOfDay,
-		MaxReferrer:     maxReferrer,
-		Range:           rangeParam,
-		CustomFrom:      customFrom,
-		CustomTo:        customTo,
-		Router:          router,
-		IncludeBots:     includeBots,
-		Routers:         routers,
-		Page:            "overview",
-		ActiveTab:       activeTab,
-		StatusDonut:     statusDonut,
-		MethodDonut:     methodDonut,
-		UserAgentDonut:  userAgentDonut,
+		Stats:             stats,
+		RequestsChart:     requestsChart,
+		VisitorsChart:     visitorsChart,
+		TopPaths:          topPaths,
+		StatusCodes:       statusCodes,
+		TopReferrers:      referrers,
+		NotFoundPaths:     notFoundPaths,
+		UserAgents:        userAgents,
+		Methods:           methods,
+		StatusDetails:     statusDetails,
+		HourOfDay:         hourOfDay,
+		MaxRequests:       maxRequests,
+		MaxVisitors:       maxVisitors,
+		MaxStatus:         maxStatus,
+		MaxNotFound:       maxNotFound,
+		MaxUserAgent:      maxUserAgent,
+		MaxMethod:         maxMethod,
+		MaxStatusDet:      maxStatusDet,
+		MaxHourOfDay:      maxHourOfDay,
+		MaxReferrer:       maxReferrer,
+		Range:             rangeParam,
+		CustomFrom:        customFrom,
+		CustomTo:          customTo,
+		Router:            router,
+		IncludeBots:       includeBots,
+		Routers:           routers,
+		Page:              "overview",
+		ActiveTab:         activeTab,
+		StatusDonut:       statusDonut,
+		MethodDonut:       methodDonut,
+		UserAgentDonut:    userAgentDonut,
 		HourVisitors:      hourVisitors,
 		MaxHourVisitors:   maxHourVisitors,
 		Countries:         countries,
@@ -706,6 +706,12 @@ func (s *Server) getOverviewData(c *fiber.Ctx) (*OverviewData, error) {
 		MaxResponseTime:   maxResponseTime,
 		Comparison:        comparison,
 	}, nil
+}
+
+// handleLogout responds with 401 to clear basic auth credentials from the browser
+func (s *Server) handleLogout(c *fiber.Ctx) error {
+	c.Set("WWW-Authenticate", `Basic realm="Trail"`)
+	return c.SendStatus(fiber.StatusUnauthorized)
 }
 
 // DrilldownPathData represents data for the path drilldown partial
@@ -795,11 +801,11 @@ func (s *Server) handleStatusDrilldown(c *fiber.Ctx) error {
 
 // DrilldownStatusCodeData represents data for the status code drilldown partial
 type DrilldownStatusCodeData struct {
-	Code       int
-	Paths      []StatusCodePathStat
-	Methods    []StatusCodeMethodStat
-	MaxPath    int64
-	MaxMethod  int64
+	Code      int
+	Paths     []StatusCodePathStat
+	Methods   []StatusCodeMethodStat
+	MaxPath   int64
+	MaxMethod int64
 }
 
 // handleStatusCodeDrilldown serves the inline drilldown detail for a specific status code
@@ -869,18 +875,18 @@ func (s *Server) handleStatusCodeDrilldown(c *fiber.Ctx) error {
 
 // PanelPathsData represents data for the paginated paths panel
 type PanelPathsData struct {
-	Paths      []PathStat
-	TotalCount int64
-	Page       int
-	TotalPages int
-	Limit      int
-	Sort       string
-	Order      string
-	Range      string
-	Router     string
+	Paths       []PathStat
+	TotalCount  int64
+	Page        int
+	TotalPages  int
+	Limit       int
+	Sort        string
+	Order       string
+	Range       string
+	Router      string
 	IncludeBots bool
-	TotalReqs  int64
-	Summary    *PathsSummaryResult
+	TotalReqs   int64
+	Summary     *PathsSummaryResult
 }
 
 // PanelReferrersData represents data for the paginated referrers panel
@@ -900,15 +906,15 @@ type PanelReferrersData struct {
 
 // PanelNotFoundData represents data for the paginated 404 panel
 type PanelNotFoundData struct {
-	Paths      []PathStat
-	TotalCount int64
-	Page       int
-	TotalPages int
-	Limit      int
-	Sort       string
-	Order      string
-	Range      string
-	Router     string
+	Paths       []PathStat
+	TotalCount  int64
+	Page        int
+	TotalPages  int
+	Limit       int
+	Sort        string
+	Order       string
+	Range       string
+	Router      string
 	IncludeBots bool
 }
 
