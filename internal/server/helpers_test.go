@@ -107,7 +107,7 @@ func TestGenerateRedirectSuggestion(t *testing.T) {
 		{"/wp-login.php", "Redirect 301 /wp-login.php /", "middlewares:\n  redirect_wp-login_php:\n    redirectRegex:\n      regex: \"^/wp-login.php$\"\n      replacement: \"/\"\n      permanent: true"},
 		{"/wp-admin/setup-config.php", "Redirect 301 /wp-admin/setup-config.php /", "middlewares:\n  redirect_wp-admin_setup-config_php:\n    redirectRegex:\n      regex: \"^/wp-admin/setup-config.php$\"\n      replacement: \"/\"\n      permanent: true"},
 		{"/.env", "Redirect 301 /.env /", "middlewares:\n  redirect__env:\n    redirectRegex:\n      regex: \"^/.env$\"\n      replacement: \"/\"\n      permanent: true"},
-		{"/foo", "", ""},
+		{"/foo", "Redirect 301 /foo /", "middlewares:\n  redirect_foo:\n    redirectRegex:\n      regex: \"^/foo$\"\n      replacement: \"/\"\n      permanent: true"},
 		{"/XMLRPC.php", "Redirect 301 /XMLRPC.php /", "middlewares:\n  redirect_xmlrpc_php:\n    redirectRegex:\n      regex: \"^/XMLRPC.php$\"\n      replacement: \"/\"\n      permanent: true"},
 	}
 
@@ -132,10 +132,10 @@ func TestApplyRedirectSuggestions(t *testing.T) {
 	if paths[0].TraefikSuggestion == "" {
 		t.Errorf("expected Traefik suggestion for %s", paths[0].Path)
 	}
-	if paths[1].Suggestion != "" {
-		t.Errorf("unexpected suggestion for %s", paths[1].Path)
+	if paths[1].Suggestion == "" {
+		t.Errorf("expected suggestion for %s", paths[1].Path)
 	}
-	if paths[1].TraefikSuggestion != "" {
-		t.Errorf("unexpected Traefik suggestion for %s", paths[1].Path)
+	if paths[1].TraefikSuggestion == "" {
+		t.Errorf("expected Traefik suggestion for %s", paths[1].Path)
 	}
 }

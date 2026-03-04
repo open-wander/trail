@@ -718,9 +718,10 @@ func (s *Server) handleLogout(c *fiber.Ctx) error {
 
 // DrilldownPathData represents data for the path drilldown partial
 type DrilldownPathData struct {
-	Path       string
-	Details    []PathDetail
-	Suggestion string // optional redirect hint for suspicious 404 paths
+	Path              string
+	Details           []PathDetail
+	Suggestion        string // optional Apache redirect hint
+	TraefikSuggestion string // optional Traefik redirect snippet
 }
 
 // DrilldownStatusData represents data for the status drilldown partial
@@ -749,9 +750,10 @@ func (s *Server) handlePathDrilldown(c *fiber.Ctx) error {
 
 	suggestion := generateRedirectSuggestion(path)
 	data := DrilldownPathData{
-		Path:       path,
-		Details:    details,
-		Suggestion: suggestion,
+		Path:              path,
+		Details:           details,
+		Suggestion:        suggestion,
+		TraefikSuggestion: generateTraefikSnippet(path),
 	}
 
 	var buf bytes.Buffer
@@ -844,6 +846,14 @@ func (s *Server) handleStatusCodeDrilldown(c *fiber.Ctx) error {
 	if err != nil {
 		log.Printf("Error fetching status code methods: %v", err)
 		return c.Status(500).SendString("Error loading drilldown")
+	}
+
+	// Enrich 404 paths with redirect suggestions
+	if code == 404 {
+		for i := range paths {
+			paths[i].Suggestion = generateRedirectSuggestion(paths[i].Path)
+			paths[i].TraefikSuggestion = generateTraefikSnippet(paths[i].Path)
+		}
 	}
 
 	maxPath := int64(1)

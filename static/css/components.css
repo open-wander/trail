@@ -242,6 +242,25 @@ th {
     border-radius: var(--radius-lg);
 }
 
+.btn-xs {
+    padding: 0.1rem 0.4rem;
+    font-size: 0.65rem;
+    border-radius: var(--radius-sm);
+    line-height: 1.1;
+    font-weight: 500;
+}
+
+.suggestion-btns {
+    display: inline-flex;
+    gap: 0.25rem;
+}
+
+.btn-copied {
+    background: var(--green, #22c55e);
+    color: #fff;
+    border-color: var(--green, #22c55e);
+}
+
 
 /* --- Cards --- */
 .card {

@@ -53,9 +53,18 @@ function updateThemeLabel(theme) {
 }
 updateThemeLabel(document.documentElement.getAttribute('data-theme'));
 
-function copyText(text) {
+function copyText(text, btn) {
     if (!text) return;
-    navigator.clipboard.writeText(text).catch(function(err){
+    var el = btn || event.currentTarget;
+    navigator.clipboard.writeText(text).then(function(){
+        var orig = el.textContent;
+        el.textContent = 'Copied';
+        el.classList.add('btn-copied');
+        setTimeout(function(){
+            el.textContent = orig;
+            el.classList.remove('btn-copied');
+        }, 1500);
+    }).catch(function(err){
         console.error('clipboard write failed', err);
     });
 }

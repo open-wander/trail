@@ -317,43 +317,21 @@ func pct(value, max int64) int {
 	return result
 }
 
-// generateRedirectSuggestion returns a simple redirect rule for known
-// bot/scanner paths that commonly trigger 404s (e.g. WordPress probes).
-// If the path isn't recognised we return an empty string.
+// generateRedirectSuggestion returns an Apache redirect rule for any 404 path.
 func generateRedirectSuggestion(path string) string {
-	// sanity: suggestions are only meaningful for absolute paths
 	if path == "" || path[0] != '/' {
 		return ""
 	}
-	lower := strings.ToLower(path)
-	// list of patterns we care about; they could be extended in future
-	if strings.HasPrefix(lower, "/wp-") ||
-		lower == "/xmlrpc.php" ||
-		lower == "/.env" ||
-		lower == "/admin" ||
-		lower == "/setup-config.php" {
-		return fmt.Sprintf("Redirect 301 %s /", path)
-	}
-	return ""
+	return fmt.Sprintf("Redirect 301 %s /", path)
 }
 
-// generateTraefikSnippet returns a tiny Traefik YAML redirectRegex snippet
-// for the same paths. This is shown alongside the Apache rule in the UI.
+// generateTraefikSnippet returns a Traefik YAML redirectRegex snippet for any 404 path.
 func generateTraefikSnippet(path string) string {
 	if path == "" || path[0] != '/' {
 		return ""
 	}
-	lower := strings.ToLower(path)
-	if strings.HasPrefix(lower, "/wp-") ||
-		lower == "/xmlrpc.php" ||
-		lower == "/.env" ||
-		lower == "/admin" ||
-		lower == "/setup-config.php" {
-		// simple single-rule snippet; real users can adjust names as needed
-		return fmt.Sprintf("middlewares:\n  redirect_%s:\n    redirectRegex:\n      regex: \"^%s$\"\n      replacement: \"/\"\n      permanent: true",
-			escapeForName(path), path)
-	}
-	return ""
+	return fmt.Sprintf("middlewares:\n  redirect_%s:\n    redirectRegex:\n      regex: \"^%s$\"\n      replacement: \"/\"\n      permanent: true",
+		escapeForName(path), path)
 }
 
 // escapeForName converts a path into a safe identifier fragment for YAML

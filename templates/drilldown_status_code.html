@@ -10,6 +10,7 @@
                         <th class="text-right">Bytes</th>
                         <th class="text-right">Avg Ms</th>
                         <th>Also Returns</th>
+                        {{if eq $.Code 404}}<th>Suggestion</th>{{end}}
                     </tr>
                 </thead>
                 <tbody>
@@ -24,6 +25,12 @@
                             <span class="method-badge" style="color: {{statusCodeColor .Status}}; border-color: {{statusCodeColor .Status}};">{{.Status}} ({{formatNumber .Count}})</span>
                             {{end}}
                         </td>
+                        {{if eq $.Code 404}}<td>{{if .Suggestion}}
+                            <span class="suggestion-btns">
+                                <button class="btn btn-outline btn-xs" onclick="event.stopPropagation();copyText(this.dataset.text, this)" data-text="{{.Suggestion}}">Apache</button>
+                                <button class="btn btn-outline btn-xs" onclick="event.stopPropagation();copyText(this.dataset.text, this)" data-text="{{.TraefikSuggestion}}">Traefik</button>
+                            </span>
+                        {{end}}</td>{{end}}
                     </tr>
                     {{end}}
                 </tbody>

@@ -16,11 +16,10 @@
                 <td class="text-right text-tabular">{{formatNumber .Count}}</td>
                 <td class="text-right text-tabular">{{formatBytes .Bytes}}</td>
                 <td>{{if .Suggestion}}
-                    <div class="suggestion-block">
-                        <code id="apache-{{.Path}}">{{.Suggestion}}</code>
-                        <button class="btn btn-xs" onclick="copyText(this.dataset.text)" data-text="{{.Suggestion}}">Apache</button>
-                        <button class="btn btn-xs" onclick="copyText(this.dataset.text)" data-text="{{.TraefikSuggestion}}">Traefik</button>
-                    </div>
+                    <span class="suggestion-btns">
+                        <button class="btn btn-outline btn-xs" onclick="event.stopPropagation();copyText(this.dataset.text, this)" data-text="{{.Suggestion}}">Apache</button>
+                        <button class="btn btn-outline btn-xs" onclick="event.stopPropagation();copyText(this.dataset.text, this)" data-text="{{.TraefikSuggestion}}">Traefik</button>
+                    </span>
                 {{end}}</td>
             </tr>
             <tr class="drilldown-row" style="display:none;"><td colspan="4"><div class="drilldown"></div></td></tr>

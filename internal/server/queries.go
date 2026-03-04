@@ -863,11 +863,13 @@ func (q *Queries) StatusClassDrilldown(f Filter, class string) ([]SpecificStatus
 
 // StatusCodePathStat represents a path's stats for a specific status code
 type StatusCodePathStat struct {
-	Path        string
-	Count       int64
-	Bytes       int64
-	AvgMs       int64
-	AltStatuses []AltStatus
+	Path              string
+	Count             int64
+	Bytes             int64
+	AvgMs             int64
+	AltStatuses       []AltStatus
+	Suggestion        string // optional redirect hint (populated for 404s)
+	TraefikSuggestion string // optional Traefik redirect snippet
 }
 
 // AltStatus represents an alternate status code returned for a path
