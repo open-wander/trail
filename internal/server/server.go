@@ -326,12 +326,29 @@ func generateRedirectSuggestion(path string) string {
 }
 
 // generateTraefikSnippet returns a Traefik YAML redirectRegex snippet for any 404 path.
+// Traefik's redirectRegex matches the full URL (scheme+host+path), so we
+// capture the host prefix and preserve it in the replacement.
 func generateTraefikSnippet(path string) string {
 	if path == "" || path[0] != '/' {
 		return ""
 	}
-	return fmt.Sprintf("middlewares:\n  redirect_%s:\n    redirectRegex:\n      regex: \"^%s$\"\n      replacement: \"/\"\n      permanent: true",
-		escapeForName(path), path)
+	return fmt.Sprintf("middlewares:\n  redirect_%s:\n    redirectRegex:\n      regex: \"^(https?://[^/]+)%s\"\n      replacement: \"${1}/\"\n      permanent: true",
+		escapeForName(path), escapeRegex(path))
+}
+
+// escapeRegex escapes special regex characters in a path for use in Traefik config.
+func escapeRegex(s string) string {
+	var b strings.Builder
+	for _, c := range s {
+		switch c {
+		case '.', '?', '+', '*', '{', '}', '[', ']', '(', ')', '|', '^', '$', '\\':
+			b.WriteRune('\\')
+			b.WriteRune(c)
+		default:
+			b.WriteRune(c)
+		}
+	}
+	return b.String()
 }
 
 // escapeForName converts a path into a safe identifier fragment for YAML
