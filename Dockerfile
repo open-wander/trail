@@ -1,5 +1,9 @@
 # Build stage
-FROM golang:1.25-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS builder
+
+# Cross-compile from the build host's native arch; only the runtime
+# stage below is emulated, which keeps arm64 builds fast.
+ARG TARGETARCH
 
 WORKDIR /build
 
@@ -8,7 +12,7 @@ RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o trail ./cmd/trail
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=$TARGETARCH go build -o trail ./cmd/trail
 
 # Runtime stage
 FROM alpine:3.21
