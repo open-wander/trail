@@ -13,6 +13,7 @@ import (
 	"time"
 	"unicode"
 
+	sentryfiber "github.com/getsentry/sentry-go/fiber"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/basicauth"
 	"github.com/gofiber/fiber/v2/middleware/filesystem"
@@ -40,6 +41,12 @@ func New(cfg *config.Config, database *sql.DB, templatesFS, staticFS fs.FS) *Ser
 		AppName:               "Trail Analytics",
 		DisableStartupMessage: false,
 	})
+
+	// Crash reporting (GlitchTip) when SENTRY_DSN is set - outermost, so it
+	// captures panics; Repanic:false returns a 500 instead of crashing.
+	if os.Getenv("SENTRY_DSN") != "" {
+		app.Use(sentryfiber.New(sentryfiber.Options{Repanic: false}))
+	}
 
 	// Initialize queries
 	queries := NewQueries(database)

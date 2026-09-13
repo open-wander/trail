@@ -9,6 +9,8 @@ import (
 	"syscall"
 	"time"
 
+	sentry "github.com/getsentry/sentry-go"
+
 	trail "github.com/open-wander/trail"
 	"github.com/open-wander/trail/internal/aggregator"
 	"github.com/open-wander/trail/internal/backfill"
@@ -25,6 +27,25 @@ func main() {
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("Failed to load configuration: %v", err)
+	}
+
+	// Crash reporting to GlitchTip (Sentry protocol) when SENTRY_DSN is set.
+	if dsn := os.Getenv("SENTRY_DSN"); dsn != "" {
+		env := os.Getenv("SENTRY_ENVIRONMENT")
+		if env == "" {
+			env = "production"
+		}
+		if err := sentry.Init(sentry.ClientOptions{
+			Dsn:              dsn,
+			Environment:      env,
+			Release:          os.Getenv("SENTRY_RELEASE"),
+			AttachStacktrace: true,
+		}); err != nil {
+			log.Printf("sentry init: %v", err)
+		} else {
+			log.Printf("crash reporting enabled (environment=%s)", env)
+			defer sentry.Flush(2 * time.Second)
+		}
 	}
 
 	// Open database
