@@ -87,6 +87,14 @@ If the file is missing or unreadable, Trail logs a warning and runs without coun
 
 ## Deployment
 
+### The open-wander instance (stats.openwander.org)
+
+Runs on a Nomad cluster as a platform job, tailing the ingress access log,
+with the GeoIP file fetched on each deploy and basic auth from a Nomad
+variable. The job spec lives in the (private) infrastructure repo, pinned
+to a release tag of this repo; a new tag here does not deploy itself. The
+sections below are for running your own instance.
+
 ### Binary on a Linux server
 
 ```bash
