@@ -91,9 +91,14 @@ If the file is missing or unreadable, Trail logs a warning and runs without coun
 
 Runs on a Nomad cluster as a platform job, tailing the ingress access log,
 with the GeoIP file fetched on each deploy and basic auth from a Nomad
-variable. The job spec lives in the (private) infrastructure repo, pinned
-to a release tag of this repo; a new tag here does not deploy itself. The
-sections below are for running your own instance.
+variable. The job spec lives in the (private) infrastructure repo, pinned to
+a release tag of this repo.
+
+To publish a release: `git tag vX.Y.Z && git push origin vX.Y.Z` builds and
+pushes the multi-arch image to GHCR (`.github/workflows/release.yml`). It
+does **not** deploy - the infrastructure repo pins the new tag and rolls it
+out, because the platform owns where Trail runs. The sections below are for
+running your own instance.
 
 ### Binary on a Linux server
 
