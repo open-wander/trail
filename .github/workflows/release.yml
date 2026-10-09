@@ -47,8 +47,10 @@ jobs:
           name: trail-${{ matrix.goos }}-${{ matrix.goarch }}
           path: trail-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz
 
+  # Self-hosted runner (mcsvr1-ow): no Docker Hub pull for binfmt on every
+  # run, arm64 via the binfmt already installed there. Same as ramble.
   docker:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     needs: build
     steps:
       - uses: actions/checkout@v4
