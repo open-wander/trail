@@ -30,16 +30,16 @@ type Aggregator struct {
 	ipSalt        string
 	geoReader     *geoip2.Reader
 
-	mu            sync.Mutex
-	requests      map[requestKey]*requestVal
-	visitors      map[visitorKey]struct{}
-	referrers     map[referrerKey]int
-	userAgents    map[userAgentKey]int
-	countries     map[countryKey]int
-	browsers      map[browserKey]int
-	osStats       map[osKey]int
-	durationHist  map[durationHistKey]int
-	bufferSize    int
+	mu           sync.Mutex
+	requests     map[requestKey]*requestVal
+	visitors     map[visitorKey]struct{}
+	referrers    map[referrerKey]int
+	userAgents   map[userAgentKey]int
+	countries    map[countryKey]int
+	browsers     map[browserKey]int
+	osStats      map[osKey]int
+	durationHist map[durationHistKey]int
+	bufferSize   int
 }
 
 type requestKey struct {
@@ -99,7 +99,8 @@ type durationHistKey struct {
 }
 
 // New creates a new Aggregator with a 10-second flush interval.
-// If p is nil, defaults to a Traefik parser.
+// If p is nil, defaults to a Traefik parser, which accepts both Traefik CLF
+// and Traefik JSON lines.
 // geoDBPath is optional; if empty or the file can't be opened, GeoIP lookup is disabled.
 func New(db *sql.DB, p *parser.Parser, geoDBPath string) *Aggregator {
 	if p == nil {

@@ -12,7 +12,7 @@ type Config struct {
 	DBPath        string // Path to SQLite database file
 	Listen        string // HTTP listen address
 	RetentionDays int    // Days to retain analytics data
-	LogFormat     string // Log format: "auto", "traefik", or "combined"
+	LogFormat     string // Log format: "auto", "traefik", "traefik-json", or "combined"
 
 	// Authentication settings (all optional)
 	HtpasswdFile string // Path to htpasswd file for authentication
@@ -26,14 +26,14 @@ type Config struct {
 // Load reads configuration from environment variables and applies defaults
 func Load() (*Config, error) {
 	cfg := &Config{
-		LogFile:       getEnvOrDefault("TRAIL_LOG_FILE", "/logs/access.log"),
-		DBPath:        getEnvOrDefault("TRAIL_DB_PATH", "/data/trail.db"),
-		Listen:        getEnvOrDefault("TRAIL_LISTEN", ":8080"),
-		LogFormat:     getEnvOrDefault("TRAIL_LOG_FORMAT", "auto"),
-		HtpasswdFile:  os.Getenv("TRAIL_HTPASSWD_FILE"),
-		AuthUser:      os.Getenv("TRAIL_AUTH_USER"),
-		AuthPass:      os.Getenv("TRAIL_AUTH_PASS"),
-		GeoIPPath:     os.Getenv("TRAIL_GEOIP_PATH"),
+		LogFile:      getEnvOrDefault("TRAIL_LOG_FILE", "/logs/access.log"),
+		DBPath:       getEnvOrDefault("TRAIL_DB_PATH", "/data/trail.db"),
+		Listen:       getEnvOrDefault("TRAIL_LISTEN", ":8080"),
+		LogFormat:    getEnvOrDefault("TRAIL_LOG_FORMAT", "auto"),
+		HtpasswdFile: os.Getenv("TRAIL_HTPASSWD_FILE"),
+		AuthUser:     os.Getenv("TRAIL_AUTH_USER"),
+		AuthPass:     os.Getenv("TRAIL_AUTH_PASS"),
+		GeoIPPath:    os.Getenv("TRAIL_GEOIP_PATH"),
 	}
 
 	// Parse retention days with default

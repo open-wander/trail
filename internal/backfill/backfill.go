@@ -20,7 +20,7 @@ import (
 // Run imports rotated log files (access.log.1, access.log.2.gz, etc.)
 // that haven't been imported yet. It processes them oldest-first using
 // a dedicated aggregator instance, then marks each as imported.
-// If p is nil, defaults to a Traefik parser.
+// If p is nil, defaults to a Traefik parser (CLF and JSON lines).
 func Run(ctx context.Context, db *sql.DB, logPath string, p *parser.Parser) error {
 	dir := filepath.Dir(logPath)
 	baseName := filepath.Base(logPath)

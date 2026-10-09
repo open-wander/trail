@@ -596,3 +596,16 @@ func TestUserAgentUpsert(t *testing.T) {
 		t.Errorf("expected Chrome count=8 after upsert, got %d", count)
 	}
 }
+
+func TestNewNilParserAcceptsTraefikJSON(t *testing.T) {
+	agg := New(testDB(t), nil, "")
+	lines := []string{
+		`91.34.143.167 - - [07/Jan/2026:16:17:08 +0000] "GET / HTTP/1.1" 200 5 "-" "curl/8.7.1" 1 "web@docker" "http://172.19.0.4:80" 1ms`,
+		`{"ClientHost":"192.168.65.1","DownstreamContentSize":19,"DownstreamStatus":404,"Duration":20916,"RequestMethod":"GET","RequestPath":"/.env","RequestProtocol":"HTTP/1.1","StartUTC":"2026-10-09T21:07:16.918467925Z","request_User-Agent":"curl/8.7.1"}`,
+	}
+	for _, line := range lines {
+		if _, err := agg.parser.ParseLine(line); err != nil {
+			t.Errorf("default parser rejected %q: %v", line, err)
+		}
+	}
+}

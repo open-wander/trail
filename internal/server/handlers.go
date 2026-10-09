@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/open-wander/trail/internal/parser"
 )
 
 // DonutSegment represents one segment of a donut chart
@@ -1163,8 +1164,9 @@ func (s *Server) getSecurityData(c *fiber.Ctx) (*SecurityData, error) {
 	customFrom := c.Query("custom_from", "")
 	customTo := c.Query("custom_to", "")
 
-	// Threat patterns - use suspicious path mode for combined format
-	suspiciousPathMode := s.config.LogFormat == "combined"
+	// Threat patterns - use suspicious path mode for combined format only;
+	// both Traefik formats (CLF and JSON) record routers, so use "unrouted".
+	suspiciousPathMode := parser.ParseFormat(s.config.LogFormat) == parser.FormatCombined
 	threatPatterns, err := s.queries.ThreatPatterns(filter, suspiciousPathMode)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch threat patterns: %w", err)

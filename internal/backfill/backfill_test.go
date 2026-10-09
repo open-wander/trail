@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	traildb "github.com/open-wander/trail/internal/db"
+	"github.com/open-wander/trail/internal/parser"
 	_ "modernc.org/sqlite"
 )
 
@@ -328,5 +329,76 @@ func TestProcessFile_ContextCancelled(t *testing.T) {
 	err := processFile(ctx, f, lines)
 	if err == nil {
 		t.Error("expected error from cancelled context")
+	}
+}
+
+// TestRun_MixedCLFAndJSON covers the switchover from Traefik CLF to JSON:
+// a rotated file holding CLF lines followed by JSON lines for the same
+// requests must aggregate both halves identically.
+func TestRun_MixedCLFAndJSON(t *testing.T) {
+	const (
+		clfRouted    = `192.168.65.1 - - [09/Oct/2026:21:07:16 +0000] "GET /some/path HTTP/1.1" 404 19 "https://ref.example/" "Mozilla/5.0 test" 1 "echo@file" "http://127.0.0.1:8080" 1ms`
+		clfUnrouted  = `192.168.65.1 - - [09/Oct/2026:21:07:16 +0000] "GET /.env HTTP/1.1" 404 19 "-" "curl/8.7.1" 2 "-" "-" 0ms`
+		jsonRouted   = `{"ClientHost":"192.168.65.1","DownstreamContentSize":19,"DownstreamStatus":404,"Duration":1649750,"RequestMethod":"GET","RequestPath":"/some/path","RequestProtocol":"HTTP/1.1","RouterName":"echo@file","ServiceURL":"http://127.0.0.1:8080","StartUTC":"2026-10-09T21:07:16.897593508Z","request_Referer":"https://ref.example/","request_User-Agent":"Mozilla/5.0 test"}`
+		jsonUnrouted = `{"ClientHost":"192.168.65.1","DownstreamContentSize":19,"DownstreamStatus":404,"Duration":20916,"RequestMethod":"GET","RequestPath":"/.env","RequestProtocol":"HTTP/1.1","StartUTC":"2026-10-09T21:07:16.918467925Z","request_User-Agent":"curl/8.7.1"}`
+	)
+
+	for _, format := range []string{"", "auto", "traefik", "traefik-json"} {
+		t.Run("format="+format, func(t *testing.T) {
+			dir := t.TempDir()
+			db := testDB(t)
+			logPath := filepath.Join(dir, "access.log")
+			if err := os.WriteFile(logPath, nil, 0644); err != nil {
+				t.Fatal(err)
+			}
+			content := clfRouted + "\n" + clfUnrouted + "\n" + jsonRouted + "\n" + jsonUnrouted + "\n"
+			if err := os.WriteFile(filepath.Join(dir, "access.log.1"), []byte(content), 0644); err != nil {
+				t.Fatal(err)
+			}
+
+			var p *parser.Parser
+			if format != "" {
+				p = parser.NewParser(format)
+				p.Detect([]string{clfRouted, clfUnrouted})
+			}
+			if err := Run(context.Background(), db, logPath, p); err != nil {
+				t.Fatalf("Run failed: %v", err)
+			}
+
+			rows, err := db.Query(`SELECT router, path, status, count, bytes, duration FROM requests ORDER BY router`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer rows.Close()
+			type row struct {
+				router, path            string
+				status, count, bytes, d int64
+			}
+			var got []row
+			for rows.Next() {
+				var r row
+				if err := rows.Scan(&r.router, &r.path, &r.status, &r.count, &r.bytes, &r.d); err != nil {
+					t.Fatal(err)
+				}
+				got = append(got, r)
+			}
+			if err := rows.Err(); err != nil {
+				t.Fatal(err)
+			}
+			// Each request appears twice (CLF + JSON) and must merge into one
+			// row with count 2; a JSON line that diverged would add a row.
+			want := []row{
+				{router: "echo@file", path: "/some/path", status: 404, count: 2, bytes: 38, d: 2},
+				{router: "unrouted", path: "/.env", status: 404, count: 2, bytes: 38, d: 0},
+			}
+			if len(got) != len(want) {
+				t.Fatalf("requests rows = %+v, want %+v", got, want)
+			}
+			for i := range want {
+				if got[i] != want[i] {
+					t.Errorf("row %d = %+v, want %+v", i, got[i], want[i])
+				}
+			}
+		})
 	}
 }

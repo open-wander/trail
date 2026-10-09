@@ -62,11 +62,11 @@ func main() {
 	if p.Format() == parser.FormatAuto {
 		if lines, err := readFirstLines(cfg.LogFile, 10); err == nil && len(lines) > 0 {
 			detected := p.Detect(lines)
-			formatName := "traefik"
 			if detected == parser.FormatCombined {
-				formatName = "combined"
+				log.Printf("Auto-detected log format: %s", detected)
+			} else {
+				log.Printf("Auto-detected log format: %s (Traefik CLF and JSON lines both accepted)", detected)
 			}
-			log.Printf("Auto-detected log format: %s", formatName)
 		}
 	}
 
