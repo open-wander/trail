@@ -52,13 +52,6 @@ func ParseTraefik(line string) (*LogEntry, error) {
 		return nil, fmt.Errorf("failed to parse duration: %w", err)
 	}
 
-	unquote := func(s string) string {
-		if s == "-" {
-			return ""
-		}
-		return s
-	}
-
 	return &LogEntry{
 		IP:         matches[1],
 		Timestamp:  timestamp,
@@ -67,10 +60,10 @@ func ParseTraefik(line string) (*LogEntry, error) {
 		Protocol:   matches[6],
 		Status:     status,
 		Bytes:      bytes,
-		Referer:    unquote(matches[9]),
-		UserAgent:  unquote(matches[10]),
-		Router:     unquote(matches[11]),
-		Backend:    unquote(matches[12]),
+		Referer:    dashToEmpty(matches[9]),
+		UserAgent:  dashToEmpty(matches[10]),
+		Router:     dashToEmpty(matches[11]),
+		Backend:    dashToEmpty(matches[12]),
 		DurationMs: durationMs,
 	}, nil
 }

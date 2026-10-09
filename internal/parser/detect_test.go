@@ -8,7 +8,7 @@ func TestDetectFormat(t *testing.T) {
 	combinedNginx := `10.0.0.1 - - [10/Jan/2026:14:00:00 +0000] "POST /api/data HTTP/1.1" 201 512 "-" "curl/7.68.0" 0.003`
 
 	tests := []struct {
-		name string
+		name  string
 		lines []string
 		want  Format
 	}{
@@ -46,6 +46,41 @@ func TestDetectFormat(t *testing.T) {
 			name:  "all empty lines defaults to traefik",
 			lines: []string{"", "", ""},
 			want:  FormatTraefik,
+		},
+		{
+			name:  "pure traefik json",
+			lines: []string{jsonRoutedLine, jsonUnroutedLine, jsonRoutedTwin},
+			want:  FormatTraefikJSON,
+		},
+		{
+			name:  "switchover - clf majority over json",
+			lines: []string{traefikLine, traefikLine, jsonRoutedLine},
+			want:  FormatTraefik,
+		},
+		{
+			name:  "switchover - json majority over clf",
+			lines: []string{traefikLine, jsonRoutedLine, jsonUnroutedLine},
+			want:  FormatTraefikJSON,
+		},
+		{
+			name:  "json and clf tie goes to traefik",
+			lines: []string{traefikLine, jsonRoutedLine},
+			want:  FormatTraefik,
+		},
+		{
+			name:  "json plus clf outweigh combined",
+			lines: []string{combinedLine, combinedNginx, traefikLine, jsonRoutedLine},
+			want:  FormatTraefik,
+		},
+		{
+			name:  "combined majority over json",
+			lines: []string{combinedLine, combinedNginx, jsonRoutedLine},
+			want:  FormatCombined,
+		},
+		{
+			name:  "non-access-log json is not counted",
+			lines: []string{`{"level":"info","msg":"starting"}`, `{"level":"info","msg":"ready"}`, combinedLine},
+			want:  FormatCombined,
 		},
 		{
 			name:  "unrecognized lines default to traefik",

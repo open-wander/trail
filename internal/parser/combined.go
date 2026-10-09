@@ -58,13 +58,6 @@ func ParseCombined(line string) (*LogEntry, error) {
 		}
 	}
 
-	unquote := func(s string) string {
-		if s == "-" {
-			return ""
-		}
-		return s
-	}
-
 	return &LogEntry{
 		IP:         matches[1],
 		Timestamp:  timestamp,
@@ -73,8 +66,8 @@ func ParseCombined(line string) (*LogEntry, error) {
 		Protocol:   matches[6],
 		Status:     status,
 		Bytes:      bytes,
-		Referer:    unquote(matches[9]),
-		UserAgent:  unquote(matches[10]),
+		Referer:    dashToEmpty(matches[9]),
+		UserAgent:  dashToEmpty(matches[10]),
 		Router:     "server",
 		Backend:    "",
 		DurationMs: durationMs,
