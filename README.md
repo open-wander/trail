@@ -14,7 +14,7 @@ Self-hosted web analytics for Traefik and Apache/Nginx. No JavaScript tracking. 
 - Bandwidth and response time trends over time
 - Mobile vs desktop traffic split
 - Bot detection and security threat analysis
-- Supports Traefik, Apache, and Nginx log formats with auto-detection
+- Supports Traefik (CLF and JSON), Apache, and Nginx log formats with auto-detection
 - Basic auth via htpasswd or environment variables
 - Single binary, zero runtime dependencies
 
@@ -61,7 +61,7 @@ All configuration is via environment variables:
 | `TRAIL_DB_PATH` | `/data/trail.db` | Path to SQLite database |
 | `TRAIL_LISTEN` | `:8080` | HTTP listen address |
 | `TRAIL_RETENTION_DAYS` | `90` | Auto-delete data older than N days |
-| `TRAIL_LOG_FORMAT` | `auto` | Log format: `auto`, `traefik`, or `combined` |
+| `TRAIL_LOG_FORMAT` | `auto` | Log format: `auto`, `traefik`, `traefik-json`, or `combined` |
 | `TRAIL_HTPASSWD_FILE` | | Path to htpasswd file (bcrypt only) |
 | `TRAIL_AUTH_USER` | | Basic auth username |
 | `TRAIL_AUTH_PASS` | | Basic auth password |
@@ -73,7 +73,32 @@ Authentication priority: htpasswd file > env var credentials > no auth.
 
 - **`auto`** (default): Reads the first 10 lines and auto-detects the format
 - **`traefik`**: Traefik extended Common Log Format
+- **`traefik-json`**: Traefik JSON access log (`--accesslog.format=json`)
 - **`combined`**: Apache/Nginx Combined Log Format (with optional trailing response time)
+
+Traefik CLF and Traefik JSON are handled as one family: with `auto`, `traefik`
+or `traefik-json`, any line starting with `{` is parsed as Traefik JSON and any
+other line as Traefik CLF. A log that switches from CLF to JSON mid-file, and
+older CLF rotated files, import without reconfiguring. `combined` does not
+accept JSON lines.
+
+#### Traefik JSON headers
+
+Trail reads the referer and user agent from the `request_Referer` and
+`request_User-Agent` header fields. Keep only those two headers:
+
+```
+--accesslog.format=json
+--accesslog.fields.headers.defaultmode=drop
+--accesslog.fields.headers.names.User-Agent=keep
+--accesslog.fields.headers.names.Referer=keep
+```
+
+Do not set `--accesslog.fields.headers.defaultmode=keep`. In JSON mode that
+writes every request header to the log, including `Cookie` and
+`Authorization`. Without the two `keep` entries the log has no referer or user
+agent, so referrer reports are empty and bot detection cannot use the user
+agent.
 
 ### GeoIP (optional)
 

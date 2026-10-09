@@ -54,7 +54,7 @@ export TRAIL_LISTEN=:8080                             # Port to listen on
 
 # Optional - Retention and format
 export TRAIL_RETENTION_DAYS=90                        # Auto-delete older data
-export TRAIL_LOG_FORMAT=auto                          # auto, traefik, or combined
+export TRAIL_LOG_FORMAT=auto                          # auto, traefik, traefik-json, or combined
 
 # Optional - Authentication (choose one)
 # Option A: htpasswd file (recommended)
@@ -76,7 +76,7 @@ export TRAIL_GEOIP_PATH=/usr/share/geoip/dbip-country-lite.mmdb
 | `TRAIL_DB_PATH` | `/data/trail.db` | SQLite database location |
 | `TRAIL_LISTEN` | `:8080` | HTTP listen address (e.g., `:8080` or `127.0.0.1:8080`) |
 | `TRAIL_RETENTION_DAYS` | `90` | Delete analytics data older than N days |
-| `TRAIL_LOG_FORMAT` | `auto` | Log format: `auto`, `traefik`, or `combined` |
+| `TRAIL_LOG_FORMAT` | `auto` | Log format: `auto`, `traefik`, `traefik-json`, or `combined` |
 | `TRAIL_HTPASSWD_FILE` | | Path to htpasswd file (bcrypt hashes only) |
 | `TRAIL_AUTH_USER` | | Basic auth username (plaintext) |
 | `TRAIL_AUTH_PASS` | | Basic auth password (plaintext) |
@@ -227,6 +227,24 @@ Add to `docker-compose.yml` or Traefik config:
 accessLog:
   filePath: /var/log/traefik/access.log
 ```
+
+For the JSON format, keep only the `User-Agent` and `Referer` headers:
+```yaml
+accessLog:
+  filePath: /var/log/traefik/access.log
+  format: json
+  fields:
+    headers:
+      defaultMode: drop
+      names:
+        User-Agent: keep
+        Referer: keep
+```
+
+Do not use `defaultMode: keep` with JSON: it logs every request header,
+including `Cookie` and `Authorization`. Trail parses CLF and JSON lines in the
+same file, so switching an existing log to JSON needs no Trail change (with
+`TRAIL_LOG_FORMAT` set to `auto`, `traefik` or `traefik-json`).
 
 Then:
 ```bash
