@@ -185,11 +185,7 @@ func (a *Aggregator) Run(ctx context.Context, lines <-chan string) error {
 			return nil
 
 		case <-ticker.C:
-			if ctx.Err() != nil {
-				continue // shutdown path flushes
-			}
-			if err := a.flush(ctx); err != nil {
-				log.Printf("error during periodic flush: %v", err)
+			if err := a.onTick(ctx); err != nil {
 				return err
 			}
 
@@ -203,22 +199,42 @@ func (a *Aggregator) Run(ctx context.Context, lines <-chan string) error {
 				return nil
 			}
 
-			a.handleLine(line)
-
-			// Check if buffer size threshold is reached. After cancellation
-			// leave it to the shutdown path (see ctx.Done above).
-			a.mu.Lock()
-			size := a.bufferSize
-			a.mu.Unlock()
-
-			if size >= bufferSizeThreshold && ctx.Err() == nil {
-				if err := a.flush(ctx); err != nil {
-					log.Printf("error during buffer threshold flush: %v", err)
-					return err
-				}
+			if err := a.onLine(ctx, line); err != nil {
+				return err
 			}
 		}
 	}
+}
+
+// onTick is Run's periodic flush case.
+func (a *Aggregator) onTick(ctx context.Context) error {
+	if ctx.Err() != nil {
+		return nil // shutdown path flushes
+	}
+	if err := a.flush(ctx); err != nil {
+		log.Printf("error during periodic flush: %v", err)
+		return err
+	}
+	return nil
+}
+
+// onLine is Run's line-received case.
+func (a *Aggregator) onLine(ctx context.Context, line string) error {
+	a.handleLine(line)
+
+	// Check if buffer size threshold is reached. After cancellation
+	// leave it to the shutdown path (see ctx.Done in Run).
+	a.mu.Lock()
+	size := a.bufferSize
+	a.mu.Unlock()
+
+	if size >= bufferSizeThreshold && ctx.Err() == nil {
+		if err := a.flush(ctx); err != nil {
+			log.Printf("error during buffer threshold flush: %v", err)
+			return err
+		}
+	}
+	return nil
 }
 
 // handleLine parses a raw log line and accumulates it; unparseable lines are skipped.

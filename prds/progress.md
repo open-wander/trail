@@ -64,3 +64,12 @@ Invariants (overlay mutations, working tree never touched): swept 14: 11 guarded
 - Observation: flush() resetting buffers before the transaction means any DB error during a normal flush also drops that batch. Wider than Phase 1; not a sweep finding.
 
 Comments: no task/phase/requirement identifiers or norman scaffolding in the Phase 1 files; no directive comments in scope. ParseLine doc (7 lines) and TestSecurityThreatPatternMode doc (8 lines) left as is: each line is a distinct claim. No edits.
+
+## 2026-10-11 - Tasks 3.1 and 3.2: tests for the sweep's unguarded shutdown guarantees
+
+- 3.1: `TestProcessTick_BlockedChannelNeverSkips` in `internal/tailer/tailer_test.go`; shared `assertResumed` helper (orchestrator dedup of the resume block, per review). Advisor review: MINOR (duplication, gosec not run - run by orchestrator: only the pre-existing G115 at tailer.go:88).
+- 3.2: `onTick`/`onLine` extracted from `Run` (no behaviour change) plus two tests calling them with a cancelled ctx; `guardTestLine` renamed `clfCurlLine` and reused for the two inline copies. Advisor review: PASS.
+- Orchestrator re-sweep (overlays): skip-and-advance, skip-without-advance, threshold guard removed, tick guard removed - all four now red. Full suite and -race -count=20 green.
+- Deslop: `find-similar` unavailable in this repo (no deslop-lsp socket under .deslop/); duplication checked by grep instead.
+- PATTERN: [testing] - To make one select branch testable when ctx.Done is also ready, extract the case body to an unexported method and call it directly with a cancelled ctx; an injectable ticker does not help because select still picks at random.
+- PATTERN: [testing] - To catch a skip-after-timeout regression, hold the blocked state longer than (unsent lines x plausible skip interval) and assert the call has not returned.

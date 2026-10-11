@@ -604,7 +604,7 @@ func TestRunDrainsQueuedLinesOnCancel(t *testing.T) {
 
 	lines := make(chan string, n)
 	for range n {
-		lines <- `91.34.143.167 - - [07/Jan/2026:16:17:08 +0000] "GET / HTTP/1.1" 200 5 "-" "curl/8.7.1" 1 "web@docker" "http://172.19.0.4:80" 1ms`
+		lines <- clfCurlLine
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -626,7 +626,7 @@ func TestRunDrainsQueuedLinesOnCancel(t *testing.T) {
 func TestNewNilParserAcceptsTraefikJSON(t *testing.T) {
 	agg := New(testDB(t), nil, "")
 	lines := []string{
-		`91.34.143.167 - - [07/Jan/2026:16:17:08 +0000] "GET / HTTP/1.1" 200 5 "-" "curl/8.7.1" 1 "web@docker" "http://172.19.0.4:80" 1ms`,
+		clfCurlLine,
 		`{"ClientHost":"192.168.65.1","DownstreamContentSize":19,"DownstreamStatus":404,"Duration":20916,"RequestMethod":"GET","RequestPath":"/.env","RequestProtocol":"HTTP/1.1","StartUTC":"2026-10-09T21:07:16.918467925Z","request_User-Agent":"curl/8.7.1"}`,
 	}
 	for _, line := range lines {
@@ -674,6 +674,78 @@ func TestRunFlushesBufferedEntriesOnShutdown(t *testing.T) {
 	if total != n {
 		t.Errorf("requests count = %d, want %d", total, n)
 	}
+}
+
+const clfCurlLine = `91.34.143.167 - - [07/Jan/2026:16:17:08 +0000] "GET / HTTP/1.1" 200 5 "-" "curl/8.7.1" 1 "web@docker" "http://172.19.0.4:80" 1ms`
+
+// The post-cancel guards in Run's select cases cannot be reached
+// deterministically through Run: with ctx.Done ready, select may pick any
+// ready case. These tests call the extracted case bodies (onLine, onTick)
+// directly with an already-cancelled ctx, then run Run for the shutdown flush.
+
+// assertShutdownKeepsEntries runs Run with a cancelled ctx and an empty
+// channel (ctx.Done is the only ready case) and checks all want entries land.
+func assertShutdownKeepsEntries(t *testing.T, a *Aggregator, ctx context.Context, want int) {
+	t.Helper()
+	if err := a.Run(ctx, make(chan string)); err != nil {
+		t.Fatalf("Run returned %v, want nil", err)
+	}
+	var total int
+	if err := a.db.QueryRow(`SELECT COALESCE(SUM(count), 0) FROM requests`).Scan(&total); err != nil {
+		t.Fatalf("query requests: %v", err)
+	}
+	if total != want {
+		t.Errorf("requests count = %d, want %d", total, want)
+	}
+}
+
+func bufferedSize(a *Aggregator) int {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.bufferSize
+}
+
+func TestOnLineThresholdAfterCancelKeepsEntries(t *testing.T) {
+	a := New(testDB(t), nil, "")
+	for range bufferSizeThreshold - 1 {
+		a.handleLine(clfCurlLine)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	// This line reaches the threshold after cancellation. A nil error is the
+	// guard's real contract: a flush on a cancelled ctx fails and would make
+	// Run exit before the shutdown flush.
+	if err := a.onLine(ctx, clfCurlLine); err != nil {
+		t.Fatalf("onLine returned %v, want nil", err)
+	}
+	if got := bufferedSize(a); got != bufferSizeThreshold {
+		t.Errorf("bufferSize = %d, want %d (buffer must be kept for the shutdown flush)", got, bufferSizeThreshold)
+	}
+	assertShutdownKeepsEntries(t, a, ctx, bufferSizeThreshold)
+}
+
+func TestOnTickAfterCancelKeepsEntries(t *testing.T) {
+	a := New(testDB(t), nil, "")
+	// Entries must be buffered: flush returns early on an empty buffer, which
+	// would hide a missing guard.
+	const n = 3
+	for range n {
+		a.handleLine(clfCurlLine)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	// A nil error is the guard's real contract (see the threshold test).
+	if err := a.onTick(ctx); err != nil {
+		t.Fatalf("onTick returned %v, want nil", err)
+	}
+	if got := bufferedSize(a); got != n {
+		t.Errorf("bufferSize = %d, want %d (buffer must be kept for the shutdown flush)", got, n)
+	}
+	assertShutdownKeepsEntries(t, a, ctx, n)
 }
 
 func TestRunFlushesOnChannelCloseWithCancelledContext(t *testing.T) {
