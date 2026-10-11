@@ -286,3 +286,15 @@ func TestNewHtpasswdStartup(t *testing.T) {
 		})
 	}
 }
+
+// TestNew_StartupBannerDisabled keeps the Fiber banner off stdout, which is
+// reserved for Trail's JSON log lines.
+func TestNew_StartupBannerDisabled(t *testing.T) {
+	srv, err := New(&config.Config{}, nil, trail.TemplatesFS, trail.StaticFS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !srv.app.Config().DisableStartupMessage {
+		t.Error("DisableStartupMessage must be true")
+	}
+}

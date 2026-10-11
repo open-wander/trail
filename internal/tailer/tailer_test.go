@@ -1,8 +1,11 @@
 package tailer
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
+	"encoding/json"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -510,4 +513,42 @@ func getInode(t *testing.T, stat os.FileInfo) int64 {
 		t.Fatal("failed to get syscall.Stat_t")
 	}
 	return int64(sys.Ino)
+}
+
+// TestProcessTick_ProcessedLoggedAtDebug keeps the per-batch line out of INFO
+// output. The capture runs at DEBUG so a filtered record cannot hide a miss.
+func TestProcessTick_ProcessedLoggedAtDebug(t *testing.T) {
+	database := setupTestDB(t)
+	defer database.Close()
+
+	var buf bytes.Buffer
+	orig := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { slog.SetDefault(orig) })
+
+	logPath := filepath.Join(t.TempDir(), "test.log")
+	if err := os.WriteFile(logPath, []byte("a\nb\nc\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	tl := New(logPath, database)
+	if err := tl.processTick(context.Background(), make(chan string, 10), 0, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+
+	var found []map[string]any
+	for _, line := range bytes.Split(bytes.TrimSpace(buf.Bytes()), []byte("\n")) {
+		var m map[string]any
+		if err := json.Unmarshal(line, &m); err != nil {
+			t.Fatalf("not JSON: %q", line)
+		}
+		if m["msg"] == "tailer.processed" {
+			found = append(found, m)
+		}
+	}
+	if len(found) != 1 {
+		t.Fatalf("got %d tailer.processed records, want 1", len(found))
+	}
+	if found[0]["level"] != "DEBUG" || found[0]["lines"] != float64(3) {
+		t.Errorf("unexpected record: %v", found[0])
+	}
 }

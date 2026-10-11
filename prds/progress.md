@@ -129,3 +129,10 @@ Comments: no task/phase identifiers, norman scaffolding or directive comments in
 - Orchestrator verification: `go test -race ./...` green; overlay mutations all red (Load check removed, server check removed, blank allowed, Authorizer accepts all, each of four merge loops removed). Smoke run: half-set pair exits 1 with one JSON line and no password.
 - PATTERN: [testing] - Check a specified mutant is not equivalent before demanding it go red: a missing-map-key branch whose zero value already fails the next check cannot be detected.
 - PATTERN: [security] - Put a fail-closed rule in one function called from both the config layer and the component that enforces it, so the two cannot drift.
+
+## 2026-10-11 - Task 4.4: log-output guarantees under test
+
+- Changes: `startupAttrs` extracted in `cmd/trail/main.go`; new `cmd/trail/main_test.go` (TestAuthMode, TestStartupAttrs, TestStartupAttrsValues); TestInitWritesToStdout; TestProcessTick_ProcessedLoggedAtDebug; TestFlush_FlushedLoggedAtDebug; TestRun_FileImportingLoggedAtDebug; TestNew_StartupBannerDisabled.
+- Advisor review: PASS (non-blocking: values beyond log_level/geoip unchecked - orchestrator added TestStartupAttrsValues comparing the full slice).
+- Orchestrator overlay mutations, all red: Init to stderr, password in attrs, db_path wired to LogFile, each of three routine lines at INFO, banner on.
+- v0.5.0 released (run 38156722050): tests green on Linux amd64/arm64, image built on the self-hosted runner, GitHub release created.

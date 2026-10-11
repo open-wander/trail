@@ -142,11 +142,7 @@ func main() {
 	// Start server in goroutine (since it blocks)
 	serverErrors := make(chan error, 1)
 	go func() {
-		slog.Info("trail.starting",
-			"listen", cfg.Listen, "log_file", cfg.LogFile, "db_path", cfg.DBPath,
-			"log_format", cfg.LogFormat, "log_level", logging.ParseLevel(cfg.LogLevel).String(),
-			"retention_days", cfg.RetentionDays, "geoip", cfg.GeoIPPath != "",
-			"auth", authMode(cfg))
+		slog.Info("trail.starting", startupAttrs(cfg)...)
 		if err := srv.Start(); err != nil {
 			serverErrors <- err
 		}
@@ -189,6 +185,18 @@ func main() {
 	time.Sleep(100 * time.Millisecond)
 
 	slog.Info("trail.shutdown_complete")
+}
+
+// startupAttrs lists the fields of the trail.starting line. It is the one
+// place that decides what the startup summary exposes; credentials never
+// belong here.
+func startupAttrs(cfg *config.Config) []any {
+	return []any{
+		"listen", cfg.Listen, "log_file", cfg.LogFile, "db_path", cfg.DBPath,
+		"log_format", cfg.LogFormat, "log_level", logging.ParseLevel(cfg.LogLevel).String(),
+		"retention_days", cfg.RetentionDays, "geoip", cfg.GeoIPPath != "",
+		"auth", authMode(cfg),
+	}
 }
 
 // authMode names the configured authentication method for the startup

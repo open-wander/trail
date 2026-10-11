@@ -3,7 +3,9 @@ package logging
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"log/slog"
+	"os"
 	"strings"
 	"testing"
 )
@@ -81,5 +83,39 @@ func TestNewEmitsJSONAndFiltersByLevel(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestInitWritesToStdout proves the default logger goes to os.Stdout (the
+// logging standard), not stderr. It swaps global state, so no t.Parallel.
+func TestInitWritesToStdout(t *testing.T) {
+	origOut, origLog := os.Stdout, slog.Default()
+	restore := func() {
+		os.Stdout = origOut
+		slog.SetDefault(origLog)
+	}
+	t.Cleanup(restore)
+
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+	os.Stdout = w
+	Init("info")
+	slog.Info("logging.stdout_probe", "k", "v")
+	restore()
+	w.Close()
+
+	data, err := io.ReadAll(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	recs := decodeLines(t, bytes.NewBuffer(data))
+	if len(recs) != 1 {
+		t.Fatalf("got %d records on stdout, want 1: %q", len(recs), data)
+	}
+	if recs[0]["msg"] != "logging.stdout_probe" || recs[0]["level"] != "INFO" {
+		t.Errorf("unexpected record: %v", recs[0])
 	}
 }

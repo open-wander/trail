@@ -1291,3 +1291,32 @@ func TestRestoreMergesIntoLiveBuffer(t *testing.T) {
 		t.Errorf("duration_hist total = %d, want 5", got)
 	}
 }
+
+// TestFlush_FlushedLoggedAtDebug keeps the per-flush line out of INFO output.
+func TestFlush_FlushedLoggedAtDebug(t *testing.T) {
+	db := testDB(t)
+	agg := New(db, nil, "")
+	buf := captureLog(t)
+
+	ts := time.Date(2026, 1, 7, 16, 30, 0, 0, time.UTC)
+	agg.accumulate(humanEntry("1.2.3.4", ts, "/", ""))
+	if err := agg.flush(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	var found []map[string]any
+	for _, r := range logRecords(t, buf) {
+		if r["msg"] == "aggregator.flushed" {
+			found = append(found, r)
+		}
+	}
+	if len(found) != 1 {
+		t.Fatalf("got %d aggregator.flushed records, want 1", len(found))
+	}
+	if found[0]["level"] != "DEBUG" {
+		t.Errorf("level = %v, want DEBUG", found[0]["level"])
+	}
+	if e, _ := found[0]["entries"].(float64); e <= 0 {
+		t.Errorf("entries = %v, want > 0", found[0]["entries"])
+	}
+}

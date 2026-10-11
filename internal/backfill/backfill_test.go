@@ -1,9 +1,12 @@
 package backfill
 
 import (
+	"bytes"
 	"compress/gzip"
 	"context"
 	"database/sql"
+	"encoding/json"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"testing"
@@ -400,5 +403,44 @@ func TestRun_MixedCLFAndJSON(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestRun_FileImportingLoggedAtDebug keeps the per-file line out of INFO output.
+func TestRun_FileImportingLoggedAtDebug(t *testing.T) {
+	dir := t.TempDir()
+	db := testDB(t)
+	logPath := filepath.Join(dir, "access.log")
+	if err := os.WriteFile(logPath, nil, 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(logPath+".1", []byte(sampleLogLine+"\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var buf bytes.Buffer
+	orig := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { slog.SetDefault(orig) })
+
+	if err := Run(context.Background(), db, logPath, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	n := 0
+	for _, line := range bytes.Split(bytes.TrimSpace(buf.Bytes()), []byte("\n")) {
+		var m map[string]any
+		if err := json.Unmarshal(line, &m); err != nil {
+			t.Fatalf("not JSON: %q", line)
+		}
+		if m["msg"] == "backfill.file_importing" {
+			n++
+			if m["level"] != "DEBUG" {
+				t.Errorf("level = %v, want DEBUG", m["level"])
+			}
+		}
+	}
+	if n != 1 {
+		t.Fatalf("got %d backfill.file_importing records, want 1", n)
 	}
 }
