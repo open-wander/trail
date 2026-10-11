@@ -204,8 +204,9 @@ func TestNewHtpasswdStartup(t *testing.T) {
 	tests := []struct {
 		name     string
 		cfg      config.Config
-		wantErr  string // substring; empty means no error expected
-		wantAuth bool   // when started: requests without credentials get 401
+		wantErr  string      // substring; empty means no error expected
+		wantAuth bool        // when started: requests without credentials get 401
+		rejects  [][2]string // user/pass pairs that must get 401 although credentials are supplied
 	}{
 		{name: "missing file", cfg: config.Config{HtpasswdFile: missing}, wantErr: missing},
 		{name: "unreadable (directory)", cfg: config.Config{HtpasswdFile: dir}, wantErr: dir},
@@ -216,7 +217,15 @@ func TestNewHtpasswdStartup(t *testing.T) {
 			cfg:     config.Config{HtpasswdFile: missing, AuthUser: "u", AuthPass: "p"},
 			wantErr: missing,
 		},
-		{name: "valid file", cfg: config.Config{HtpasswdFile: valid}, wantAuth: true},
+		{
+			name:     "valid file",
+			cfg:      config.Config{HtpasswdFile: valid},
+			wantAuth: true,
+			rejects: [][2]string{
+				{"alice", "wrong"},    // known user, wrong password
+				{"mallory", "secret"}, // unknown user, alice's correct password
+			},
+		},
 		{name: "no auth configured", cfg: config.Config{}},
 		{name: "env creds", cfg: config.Config{AuthUser: "u", AuthPass: "p"}, wantAuth: true},
 	}
@@ -265,6 +274,11 @@ func TestNewHtpasswdStartup(t *testing.T) {
 				}
 				if c := status(user, pass); c == http.StatusUnauthorized {
 					t.Fatalf("valid credentials still got 401")
+				}
+				for _, r := range tt.rejects {
+					if c := status(r[0], r[1]); c != http.StatusUnauthorized {
+						t.Fatalf("credentials %q/%q status = %d, want %d", r[0], r[1], c, http.StatusUnauthorized)
+					}
 				}
 			} else if got == http.StatusUnauthorized {
 				t.Fatalf("no auth configured but request got 401")
