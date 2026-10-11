@@ -95,3 +95,17 @@ All three Phase 3 tasks DONE; table moved to TASKS-archive.md. No separate sweep
 - Noted, not changed: a fresh start logs `tailer.rotation_detected` from inode 0 (pre-existing behaviour, now visible as INFO).
 - PATTERN: [testing] - Capture logs at DEBUG in tests so absence assertions cannot pass because a record was filtered, and pin the level explicitly where the level is part of the contract.
 - PATTERN: [logging] - slog's JSON handler encodes a Stringer int type (parser.Format) as a number; pass `.String()` explicitly.
+
+## 2026-10-11 - Task 2.3: http.request log line per request
+
+- Changes: new `internal/logging/middleware.go` (`RequestLogger`, `From`, `RequestIDKey`) + tests; `internal/server/server.go` (middleware order: RequestLogger, recover with `server.panic` stack handler, sentry `Repanic: true`, static, basic auth); every log call in `internal/server/handlers.go` via `logging.From(c)`; `internal/server/request_log_test.go`; google/uuid promoted to a direct dependency; README/INSTALL note on `http.request` and `client_ip`.
+- Decisions (advisor): uuid v4 per request, inbound X-Request-ID ignored; `duration_ms` as float ms (slog.Duration would write ns under `duration`); ERROR for >= 500, INFO otherwise (no WARN for 4xx: only 401/404/missing-param 400s exist); `client_ip` = immediate peer, no X-Forwarded-For trust. Real end-user IP would be a separate task (trusted proxies + IP validation + untrusted-peer test).
+- Found beyond the spec: sentryfiber with `Repanic: false` swallowed panics and the client got 200 (logged INFO 200); without SENTRY_DSN a panic crashed the process. Fixed with fiber recover outermost-but-one and `Repanic: true`.
+- Advisor review: MINOR. Orchestrator fixes: 5xx `http.request` lines carry the returned `error` (Fiber's default ErrorHandler does not log, so this was the only trace); recovered panics log `server.panic` with the panic value, stack and the request's request_id.
+- Verification: `go test -race` on logging and server green; orchestrator overlay mutations all red: no error field, error field on non-5xx, panic log disabled, OriginalURL instead of Path, status mapping removed, Repanic false, inbound X-Request-ID trusted. Smoke run with the real binary: 401/200/404 logged, /static skipped, no password, base64 credentials or query secret in stdout/stderr, stderr empty.
+- PATTERN: [logging] - Put the request logger outside auth and recovery, or 401s and recovered panics are logged with the wrong status or not at all; then check what the recovery layer actually returns (sentryfiber Repanic:false returns nil with status 200).
+- PATTERN: [logging] - With Fiber's default ErrorHandler nothing logs a handler's returned error; the request log line is the place to carry it.
+
+## 2026-10-11 - Phase 2 collapsed
+
+All three Phase 2 tasks DONE; table moved to TASKS-archive.md. All phases in TASKS.md are now complete.

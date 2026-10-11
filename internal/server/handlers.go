@@ -3,10 +3,10 @@ package server
 import (
 	"bytes"
 	"fmt"
-	"log/slog"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/open-wander/trail/internal/logging"
 	"github.com/open-wander/trail/internal/parser"
 )
 
@@ -186,15 +186,16 @@ type SecurityData struct {
 
 // handleOverview serves the main dashboard overview page
 func (s *Server) handleOverview(c *fiber.Ctx) error {
+	logger := logging.From(c)
 	data, err := s.getOverviewData(c)
 	if err != nil {
-		slog.Error("server.query_failed", "query", "overview", "error", err)
+		logger.Error("server.query_failed", "query", "overview", "error", err)
 		return c.Status(500).SendString("Error loading dashboard data")
 	}
 
 	var buf bytes.Buffer
 	if err := s.overviewTmpl.ExecuteTemplate(&buf, "layout.html", data); err != nil {
-		slog.Error("server.render_failed", "template", "layout.html", "error", err)
+		logger.Error("server.render_failed", "template", "layout.html", "error", err)
 		return c.Status(500).SendString("Error rendering page")
 	}
 
@@ -204,15 +205,16 @@ func (s *Server) handleOverview(c *fiber.Ctx) error {
 
 // handleSecurity serves the security dashboard page
 func (s *Server) handleSecurity(c *fiber.Ctx) error {
+	logger := logging.From(c)
 	data, err := s.getSecurityData(c)
 	if err != nil {
-		slog.Error("server.query_failed", "query", "security", "error", err)
+		logger.Error("server.query_failed", "query", "security", "error", err)
 		return c.Status(500).SendString("Error loading security data")
 	}
 
 	var buf bytes.Buffer
 	if err := s.securityTmpl.ExecuteTemplate(&buf, "layout.html", data); err != nil {
-		slog.Error("server.render_failed", "template", "layout.html", "error", err)
+		logger.Error("server.render_failed", "template", "layout.html", "error", err)
 		return c.Status(500).SendString("Error rendering page")
 	}
 
@@ -231,9 +233,10 @@ var validOverviewTabs = map[string]bool{
 
 // handleAPIOverview serves the htmx partial for overview data
 func (s *Server) handleAPIOverview(c *fiber.Ctx) error {
+	logger := logging.From(c)
 	data, err := s.getOverviewData(c)
 	if err != nil {
-		slog.Error("server.query_failed", "query", "overview", "error", err)
+		logger.Error("server.query_failed", "query", "overview", "error", err)
 		return c.Status(500).SendString("Error loading dashboard data")
 	}
 
@@ -241,7 +244,7 @@ func (s *Server) handleAPIOverview(c *fiber.Ctx) error {
 
 	var buf bytes.Buffer
 	if err := s.tmpl.ExecuteTemplate(&buf, tmplName, data); err != nil {
-		slog.Error("server.render_failed", "template", tmplName, "error", err)
+		logger.Error("server.render_failed", "template", tmplName, "error", err)
 		return c.Status(500).SendString("Error rendering partial")
 	}
 
@@ -261,6 +264,7 @@ func (s *Server) handleAPIFilters(c *fiber.Ctx) error {
 
 // getOverviewData fetches and prepares data for the overview page
 func (s *Server) getOverviewData(c *fiber.Ctx) (*OverviewData, error) {
+	logger := logging.From(c)
 	// Parse query parameters
 	router := c.Query("router", "")
 	includeBots := c.Query("bots", "false") == "true"
@@ -273,7 +277,7 @@ func (s *Server) getOverviewData(c *fiber.Ctx) (*OverviewData, error) {
 	filter, rangeParam := s.buildFilterWithCustom(c, router, includeBots)
 	customFrom := c.Query("custom_from", "")
 	customTo := c.Query("custom_to", "")
-	slog.Debug("overview.query",
+	logger.Debug("overview.query",
 		"range", rangeParam, "router", router, "bots", includeBots, "from", filter.From, "to", filter.To)
 
 	// Fetch all required data
@@ -281,13 +285,13 @@ func (s *Server) getOverviewData(c *fiber.Ctx) (*OverviewData, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch total stats: %w", err)
 	}
-	slog.Debug("overview.stats_loaded", "requests", stats.Requests, "visitors", stats.Visitors)
+	logger.Debug("overview.stats_loaded", "requests", stats.Requests, "visitors", stats.Visitors)
 
 	// Compute previous period comparison
 	prevFilter := previousPeriodFilter(filter, rangeParam)
 	prevStats, err := s.queries.TotalStats(prevFilter)
 	if err != nil {
-		slog.Warn("query.partial_failed", "query", "prev_period", "error", err)
+		logger.Warn("query.partial_failed", "query", "prev_period", "error", err)
 		prevStats = nil
 	}
 	comparison := computeComparison(stats, prevStats)
@@ -357,7 +361,7 @@ func (s *Server) getOverviewData(c *fiber.Ctx) (*OverviewData, error) {
 		return nil, fmt.Errorf("failed to fetch hour of day: %w", err)
 	}
 
-	slog.Debug("overview.complete",
+	logger.Debug("overview.complete",
 		"paths", len(topPaths), "referrers", len(referrers), "agents", len(userAgents),
 		"methods", len(methods), "statuses", len(statusDetails), "hours", len(hourOfDay), "not_found", len(notFoundPaths))
 
@@ -487,7 +491,7 @@ func (s *Server) getOverviewData(c *fiber.Ctx) (*OverviewData, error) {
 	// Fetch hour-of-day visitors
 	hourVisitors, err := s.queries.HourOfDayVisitors(filter)
 	if err != nil {
-		slog.Warn("query.partial_failed", "query", "hour_visitors", "error", err)
+		logger.Warn("query.partial_failed", "query", "hour_visitors", "error", err)
 		hourVisitors = nil
 	}
 	maxHourVisitors := int64(1)
@@ -504,7 +508,7 @@ func (s *Server) getOverviewData(c *fiber.Ctx) (*OverviewData, error) {
 	}
 	trends, err := s.queries.PathDailyTrends(filter, pathNames)
 	if err != nil {
-		slog.Warn("query.partial_failed", "query", "path_trends", "error", err)
+		logger.Warn("query.partial_failed", "query", "path_trends", "error", err)
 	} else {
 		for i := range topPaths {
 			if t, ok := trends[topPaths[i].Path]; ok {
@@ -526,32 +530,32 @@ func (s *Server) getOverviewData(c *fiber.Ctx) (*OverviewData, error) {
 	// Fetch new analytics data
 	browsers, err := s.queries.BrowserBreakdown(filter)
 	if err != nil {
-		slog.Warn("query.partial_failed", "query", "browsers", "error", err)
+		logger.Warn("query.partial_failed", "query", "browsers", "error", err)
 	}
 
 	osStats, err := s.queries.OSBreakdown(filter)
 	if err != nil {
-		slog.Warn("query.partial_failed", "query", "os", "error", err)
+		logger.Warn("query.partial_failed", "query", "os", "error", err)
 	}
 
 	durationHist, err := s.queries.DurationHistogram(filter)
 	if err != nil {
-		slog.Warn("query.partial_failed", "query", "duration_histogram", "error", err)
+		logger.Warn("query.partial_failed", "query", "duration_histogram", "error", err)
 	}
 
 	percentiles, err := s.queries.DurationPercentiles(filter)
 	if err != nil {
-		slog.Warn("query.partial_failed", "query", "duration_percentiles", "error", err)
+		logger.Warn("query.partial_failed", "query", "duration_percentiles", "error", err)
 	}
 
 	bandwidthChart, err := s.queries.BandwidthTimeSeries(filter, useDaily)
 	if err != nil {
-		slog.Warn("query.partial_failed", "query", "bandwidth_series", "error", err)
+		logger.Warn("query.partial_failed", "query", "bandwidth_series", "error", err)
 	}
 
 	responseTimeChart, err := s.queries.ResponseTimeTimeSeries(filter, useDaily)
 	if err != nil {
-		slog.Warn("query.partial_failed", "query", "response_time_series", "error", err)
+		logger.Warn("query.partial_failed", "query", "response_time_series", "error", err)
 	}
 
 	// Country breakdown (only if GeoIP is configured)
@@ -560,7 +564,7 @@ func (s *Server) getOverviewData(c *fiber.Ctx) (*OverviewData, error) {
 	if geoIPEnabled {
 		countries, err = s.queries.CountryBreakdown(filter, 20)
 		if err != nil {
-			slog.Warn("query.partial_failed", "query", "countries", "error", err)
+			logger.Warn("query.partial_failed", "query", "countries", "error", err)
 		}
 	}
 
@@ -652,7 +656,7 @@ func (s *Server) getOverviewData(c *fiber.Ctx) (*OverviewData, error) {
 	// Fetch available routers for filter dropdown
 	routers, err := s.queries.Routers()
 	if err != nil {
-		slog.Warn("query.partial_failed", "query", "routers", "error", err)
+		logger.Warn("query.partial_failed", "query", "routers", "error", err)
 		routers = []string{}
 	}
 
@@ -735,6 +739,7 @@ type DrilldownStatusData struct {
 
 // handlePathDrilldown serves the inline drilldown detail for a path
 func (s *Server) handlePathDrilldown(c *fiber.Ctx) error {
+	logger := logging.From(c)
 	path := c.Query("path")
 	if path == "" {
 		return c.Status(400).SendString("path parameter required")
@@ -746,7 +751,7 @@ func (s *Server) handlePathDrilldown(c *fiber.Ctx) error {
 
 	details, err := s.queries.PathDrilldown(filter, path)
 	if err != nil {
-		slog.Error("server.query_failed", "query", "path_drilldown", "error", err)
+		logger.Error("server.query_failed", "query", "path_drilldown", "error", err)
 		return c.Status(500).SendString("Error loading drilldown")
 	}
 
@@ -760,7 +765,7 @@ func (s *Server) handlePathDrilldown(c *fiber.Ctx) error {
 
 	var buf bytes.Buffer
 	if err := s.tmpl.ExecuteTemplate(&buf, "drilldown_path.html", data); err != nil {
-		slog.Error("server.render_failed", "template", "drilldown_path.html", "error", err)
+		logger.Error("server.render_failed", "template", "drilldown_path.html", "error", err)
 		return c.Status(500).SendString("Error rendering drilldown")
 	}
 
@@ -770,6 +775,7 @@ func (s *Server) handlePathDrilldown(c *fiber.Ctx) error {
 
 // handleStatusDrilldown serves the inline drilldown detail for a status class
 func (s *Server) handleStatusDrilldown(c *fiber.Ctx) error {
+	logger := logging.From(c)
 	class := c.Query("class")
 	if class == "" {
 		return c.Status(400).SendString("class parameter required")
@@ -781,7 +787,7 @@ func (s *Server) handleStatusDrilldown(c *fiber.Ctx) error {
 
 	statuses, err := s.queries.StatusClassDrilldown(filter, class)
 	if err != nil {
-		slog.Error("server.query_failed", "query", "status_drilldown", "error", err)
+		logger.Error("server.query_failed", "query", "status_drilldown", "error", err)
 		return c.Status(500).SendString("Error loading drilldown")
 	}
 
@@ -800,7 +806,7 @@ func (s *Server) handleStatusDrilldown(c *fiber.Ctx) error {
 
 	var buf bytes.Buffer
 	if err := s.tmpl.ExecuteTemplate(&buf, "drilldown_status.html", data); err != nil {
-		slog.Error("server.render_failed", "template", "drilldown_status.html", "error", err)
+		logger.Error("server.render_failed", "template", "drilldown_status.html", "error", err)
 		return c.Status(500).SendString("Error rendering drilldown")
 	}
 
@@ -819,6 +825,7 @@ type DrilldownStatusCodeData struct {
 
 // handleStatusCodeDrilldown serves the inline drilldown detail for a specific status code
 func (s *Server) handleStatusCodeDrilldown(c *fiber.Ctx) error {
+	logger := logging.From(c)
 	code := c.QueryInt("code", 0)
 	if code < 100 || code > 599 {
 		return c.Status(400).SendString("invalid status code (must be 100-599)")
@@ -830,7 +837,7 @@ func (s *Server) handleStatusCodeDrilldown(c *fiber.Ctx) error {
 
 	paths, err := s.queries.StatusCodePaths(filter, code, 10)
 	if err != nil {
-		slog.Error("server.query_failed", "query", "status_code_paths", "error", err)
+		logger.Error("server.query_failed", "query", "status_code_paths", "error", err)
 		return c.Status(500).SendString("Error loading drilldown")
 	}
 
@@ -838,7 +845,7 @@ func (s *Server) handleStatusCodeDrilldown(c *fiber.Ctx) error {
 	for i := range paths {
 		alts, err := s.queries.PathAlternateStatuses(filter, paths[i].Path, code)
 		if err != nil {
-			slog.Warn("query.partial_failed", "query", "alt_statuses", "path", paths[i].Path, "error", err)
+			logger.Warn("query.partial_failed", "query", "alt_statuses", "path", paths[i].Path, "error", err)
 			continue
 		}
 		paths[i].AltStatuses = alts
@@ -846,7 +853,7 @@ func (s *Server) handleStatusCodeDrilldown(c *fiber.Ctx) error {
 
 	methods, err := s.queries.StatusCodeMethods(filter, code)
 	if err != nil {
-		slog.Error("server.query_failed", "query", "status_code_methods", "error", err)
+		logger.Error("server.query_failed", "query", "status_code_methods", "error", err)
 		return c.Status(500).SendString("Error loading drilldown")
 	}
 
@@ -882,7 +889,7 @@ func (s *Server) handleStatusCodeDrilldown(c *fiber.Ctx) error {
 
 	var buf bytes.Buffer
 	if err := s.tmpl.ExecuteTemplate(&buf, "drilldown_status_code.html", data); err != nil {
-		slog.Error("server.render_failed", "template", "drilldown_status_code.html", "error", err)
+		logger.Error("server.render_failed", "template", "drilldown_status_code.html", "error", err)
 		return c.Status(500).SendString("Error rendering drilldown")
 	}
 
@@ -937,6 +944,7 @@ type PanelNotFoundData struct {
 
 // handlePanelPaths serves the paginated paths panel
 func (s *Server) handlePanelPaths(c *fiber.Ctx) error {
+	logger := logging.From(c)
 	router := c.Query("router", "")
 	includeBots := c.Query("bots", "false") == "true"
 	filter, rangeParam := s.buildFilterWithCustom(c, router, includeBots)
@@ -948,13 +956,13 @@ func (s *Server) handlePanelPaths(c *fiber.Ctx) error {
 
 	result, err := s.queries.TopPathsPaginated(filter, page, limit, sort, order)
 	if err != nil {
-		slog.Error("server.query_failed", "query", "paginated_paths", "error", err)
+		logger.Error("server.query_failed", "query", "paginated_paths", "error", err)
 		return c.Status(500).SendString("Error loading paths")
 	}
 
 	summary, err := s.queries.PathsSummary(filter)
 	if err != nil {
-		slog.Warn("query.partial_failed", "query", "paths_summary", "error", err)
+		logger.Warn("query.partial_failed", "query", "paths_summary", "error", err)
 	}
 
 	stats, _ := s.queries.TotalStats(filter)
@@ -987,7 +995,7 @@ func (s *Server) handlePanelPaths(c *fiber.Ctx) error {
 
 	var buf bytes.Buffer
 	if err := s.tmpl.ExecuteTemplate(&buf, "panel_paths.html", data); err != nil {
-		slog.Error("server.render_failed", "template", "panel_paths.html", "error", err)
+		logger.Error("server.render_failed", "template", "panel_paths.html", "error", err)
 		return c.Status(500).SendString("Error rendering panel")
 	}
 
@@ -997,6 +1005,7 @@ func (s *Server) handlePanelPaths(c *fiber.Ctx) error {
 
 // handlePanelReferrers serves the paginated referrers panel
 func (s *Server) handlePanelReferrers(c *fiber.Ctx) error {
+	logger := logging.From(c)
 	router := c.Query("router", "")
 	includeBots := c.Query("bots", "false") == "true"
 	filter, rangeParam := s.buildFilterWithCustom(c, router, includeBots)
@@ -1005,7 +1014,7 @@ func (s *Server) handlePanelReferrers(c *fiber.Ctx) error {
 
 	referrers, err := s.queries.TopReferrers(filter, limit)
 	if err != nil {
-		slog.Error("server.query_failed", "query", "referrers", "error", err)
+		logger.Error("server.query_failed", "query", "referrers", "error", err)
 		return c.Status(500).SendString("Error loading referrers")
 	}
 
@@ -1026,7 +1035,7 @@ func (s *Server) handlePanelReferrers(c *fiber.Ctx) error {
 
 	var buf bytes.Buffer
 	if err := s.tmpl.ExecuteTemplate(&buf, "panel_referrers.html", data); err != nil {
-		slog.Error("server.render_failed", "template", "panel_referrers.html", "error", err)
+		logger.Error("server.render_failed", "template", "panel_referrers.html", "error", err)
 		return c.Status(500).SendString("Error rendering panel")
 	}
 
@@ -1036,6 +1045,7 @@ func (s *Server) handlePanelReferrers(c *fiber.Ctx) error {
 
 // handlePanelNotFound serves the paginated 404 panel
 func (s *Server) handlePanelNotFound(c *fiber.Ctx) error {
+	logger := logging.From(c)
 	router := c.Query("router", "")
 	includeBots := c.Query("bots", "false") == "true"
 	filter, rangeParam := s.buildFilterWithCustom(c, router, includeBots)
@@ -1044,7 +1054,7 @@ func (s *Server) handlePanelNotFound(c *fiber.Ctx) error {
 
 	notFound, err := s.queries.TopNotFound(filter, limit)
 	if err != nil {
-		slog.Error("server.query_failed", "query", "not_found_paths", "error", err)
+		logger.Error("server.query_failed", "query", "not_found_paths", "error", err)
 		return c.Status(500).SendString("Error loading 404 paths")
 	}
 	applyRedirectSuggestions(notFound)
@@ -1058,7 +1068,7 @@ func (s *Server) handlePanelNotFound(c *fiber.Ctx) error {
 
 	var buf bytes.Buffer
 	if err := s.tmpl.ExecuteTemplate(&buf, "panel_not_found.html", data); err != nil {
-		slog.Error("server.render_failed", "template", "panel_not_found.html", "error", err)
+		logger.Error("server.render_failed", "template", "panel_not_found.html", "error", err)
 		return c.Status(500).SendString("Error rendering panel")
 	}
 
@@ -1126,9 +1136,10 @@ var validSecurityTabs = map[string]bool{
 
 // handleAPISecurityPartial serves the htmx partial for security data
 func (s *Server) handleAPISecurityPartial(c *fiber.Ctx) error {
+	logger := logging.From(c)
 	data, err := s.getSecurityData(c)
 	if err != nil {
-		slog.Error("server.query_failed", "query", "security", "error", err)
+		logger.Error("server.query_failed", "query", "security", "error", err)
 		return c.Status(500).SendString("Error loading security data")
 	}
 
@@ -1136,7 +1147,7 @@ func (s *Server) handleAPISecurityPartial(c *fiber.Ctx) error {
 
 	var buf bytes.Buffer
 	if err := s.tmpl.ExecuteTemplate(&buf, tmplName, data); err != nil {
-		slog.Error("server.render_failed", "template", tmplName, "error", err)
+		logger.Error("server.render_failed", "template", tmplName, "error", err)
 		return c.Status(500).SendString("Error rendering partial")
 	}
 

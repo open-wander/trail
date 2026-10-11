@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"runtime/debug"
 	"strings"
 	"time"
 	"unicode"
@@ -17,7 +18,9 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/basicauth"
 	"github.com/gofiber/fiber/v2/middleware/filesystem"
+	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/open-wander/trail/internal/config"
+	"github.com/open-wander/trail/internal/logging"
 	"github.com/open-wander/trail/internal/parser"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -48,10 +51,23 @@ func New(cfg *config.Config, database *sql.DB, templatesFS, staticFS fs.FS) (*Se
 		DisableStartupMessage: true,
 	})
 
-	// Crash reporting (GlitchTip) when SENTRY_DSN is set - outermost, so it
-	// captures panics; Repanic:false returns a 500 instead of crashing.
+	// Request logging is outermost so it also sees 401s from basic auth and
+	// the 500 produced by a recovered panic.
+	app.Use(logging.RequestLogger())
+
+	// Turn handler panics into a 500 error instead of crashing the process;
+	// fasthttp does not recover them itself.
+	app.Use(recover.New(recover.Config{
+		EnableStackTrace: true,
+		StackTraceHandler: func(c *fiber.Ctx, e interface{}) {
+			logging.From(c).Error("server.panic", "error", fmt.Sprint(e), "stack", string(debug.Stack()))
+		},
+	}))
+
+	// Crash reporting (GlitchTip) when SENTRY_DSN is set. Inside recover so a
+	// panic is captured, then re-panicked to recover for the 500 response.
 	if os.Getenv("SENTRY_DSN") != "" {
-		app.Use(sentryfiber.New(sentryfiber.Options{Repanic: false}))
+		app.Use(sentryfiber.New(sentryfiber.Options{Repanic: true}))
 	}
 
 	// Initialize queries

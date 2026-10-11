@@ -6,6 +6,7 @@ require (
 	github.com/getsentry/sentry-go v0.49.0
 	github.com/getsentry/sentry-go/fiber v0.49.0
 	github.com/gofiber/fiber/v2 v2.52.14
+	github.com/google/uuid v1.6.0
 	github.com/oschwald/geoip2-golang/v2 v2.1.0
 	golang.org/x/crypto v0.48.0
 	modernc.org/sqlite v1.44.3
@@ -14,7 +15,6 @@ require (
 require (
 	github.com/andybalholm/brotli v1.2.1 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/klauspost/compress v1.18.6 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.22 // indirect
