@@ -77,6 +77,9 @@ func main() {
 		}
 	}
 
+	// Hand the effective format to the server before anything starts serving.
+	srv.SetLogFormat(p.Format())
+
 	// Import rotated log files before starting live tail
 	if err := backfill.Run(context.Background(), database, cfg.LogFile, p); err != nil {
 		log.Printf("Backfill failed: %v", err)

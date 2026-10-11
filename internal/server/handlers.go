@@ -1166,7 +1166,10 @@ func (s *Server) getSecurityData(c *fiber.Ctx) (*SecurityData, error) {
 
 	// Threat patterns - use suspicious path mode for combined format only;
 	// both Traefik formats (CLF and JSON) record routers, so use "unrouted".
-	suspiciousPathMode := parser.ParseFormat(s.config.LogFormat) == parser.FormatCombined
+	// s.logFormat is the explicit config or, for auto, the format detected at
+	// startup. If detection never ran (empty or missing log) it is still auto
+	// and unrouted mode applies, as Traefik is the primary deployment.
+	suspiciousPathMode := s.logFormat == parser.FormatCombined
 	threatPatterns, err := s.queries.ThreatPatterns(filter, suspiciousPathMode)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch threat patterns: %w", err)

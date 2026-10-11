@@ -8,6 +8,13 @@ import (
 
 	"github.com/open-wander/trail"
 	"github.com/open-wander/trail/internal/config"
+	"github.com/open-wander/trail/internal/parser"
+)
+
+const (
+	sampleCombined = `192.168.1.1 - - [10/Jan/2026:13:55:36 +0000] "GET / HTTP/1.1" 200 100 "-" "Chrome"`
+	sampleTraefik  = `91.34.143.167 - admin [07/Jan/2026:16:17:08 +0000] "GET /ws HTTP/1.1" 404 555 "-" "Mozilla" 1 "web@docker" "http://172.19.0.4:80" 1ms`
+	sampleJSON     = `{"ClientHost":"192.168.65.1","DownstreamStatus":404,"RequestMethod":"GET","RequestPath":"/.env","RouterName":"echo@file","StartUTC":"2026-10-09T21:07:16.897593508Z","time":"2026-10-09T21:07:16Z"}`
 )
 
 // TestSecurityThreatPatternMode drives the security summary partial and checks
@@ -15,21 +22,27 @@ import (
 // mode (status >= 400, any router); Traefik formats use unrouted mode
 // (router = 'unrouted'). Each seeded row is visible to exactly one mode.
 //
-// The auto format is deliberately not covered: the format source changes when
-// detected-format handling lands (task 1.4), which owns that case.
+// With auto, the mode follows the format the parser detected from sample
+// lines at startup. If detection never ran (empty or missing log), the view
+// stays in unrouted mode.
 func TestSecurityThreatPatternMode(t *testing.T) {
 	tests := []struct {
 		name        string
 		format      string
+		sample      []string // when set, run real detection and pass the result to the server
 		wantLabel   string
 		wantPath    string
 		absentLabel string
 		absentPath  string
 	}{
-		{"combined", "combined", "WordPress", "/wp-login.php", "Environment", "/.env"},
-		{"combined upper case", "COMBINED", "WordPress", "/wp-login.php", "Environment", "/.env"},
-		{"traefik clf", "traefik", "Environment", "/.env", "WordPress", "/wp-login.php"},
-		{"traefik json", "traefik-json", "Environment", "/.env", "WordPress", "/wp-login.php"},
+		{"combined", "combined", nil, "WordPress", "/wp-login.php", "Environment", "/.env"},
+		{"combined upper case", "COMBINED", nil, "WordPress", "/wp-login.php", "Environment", "/.env"},
+		{"traefik clf", "traefik", nil, "Environment", "/.env", "WordPress", "/wp-login.php"},
+		{"traefik json", "traefik-json", nil, "Environment", "/.env", "WordPress", "/wp-login.php"},
+		{"auto detected combined", "auto", []string{sampleCombined, sampleCombined}, "WordPress", "/wp-login.php", "Environment", "/.env"},
+		{"auto detected traefik clf", "auto", []string{sampleTraefik, sampleTraefik}, "Environment", "/.env", "WordPress", "/wp-login.php"},
+		{"auto detected traefik json", "auto", []string{sampleJSON, sampleJSON}, "Environment", "/.env", "WordPress", "/wp-login.php"},
+		{"auto undetected", "auto", nil, "Environment", "/.env", "WordPress", "/wp-login.php"},
 	}
 
 	for _, tt := range tests {
@@ -47,6 +60,12 @@ func TestSecurityThreatPatternMode(t *testing.T) {
 			srv, err := New(&config.Config{LogFormat: tt.format}, db, trail.TemplatesFS, trail.StaticFS)
 			if err != nil {
 				t.Fatalf("New: %v", err)
+			}
+
+			if tt.sample != nil {
+				p := parser.NewParser(tt.format)
+				p.Detect(tt.sample)
+				srv.SetLogFormat(p.Format())
 			}
 
 			req := httptest.NewRequest("GET", "/api/security?tab=summary&range=custom&custom_from=2026-02-01&custom_to=2026-02-28", nil)

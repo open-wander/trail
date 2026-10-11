@@ -40,3 +40,16 @@ Append-only execution log. Newest entries at the bottom.
 - PATTERN: [testing] - A cancel-immediately test cannot tell "block until ctx" apart from "timeout-skip plus ctx"; hold the channel blocked longer than the skip interval before cancelling to guard against a skip regression.
 - PATTERN: [testing] - When a later happy-path line overwrites the same state, a negative test for an earlier branch passes by accident; put the branch under test at the end of the input.
 - PATTERN: [shutdown] - Stop producers before consumers: cancel and await the tailer, then let the aggregator drain a channel that has no sender left.
+
+## 2026-10-11 - Task 1.4: security view uses the detected log format
+
+- Changes: `internal/server/server.go` (`logFormat parser.Format` field, defaulted from config in `New`; `SetLogFormat`), `internal/server/handlers.go` (mode from `s.logFormat`), `cmd/trail/main.go` (`srv.SetLogFormat(p.Format())` after detection, before backfill and serving), `internal/server/security_handler_test.go` (auto + detected combined / traefik CLF / traefik JSON / undetected), README.md and INSTALL.md note.
+- Rule: auto with no detection (empty/missing log at startup) stays in unrouted mode; documented, with advice to set `TRAIL_LOG_FORMAT=combined` explicitly for nginx logs.
+- Verification: `go test -race ./...` green. Worker mutations: handler reverted to config string -> auto+combined red; `|| FormatAuto` -> auto undetected red. Orchestrator manual run (built binary, auto, two nginx lines): threat card shows /wp-login.php and not /about-us; with the `SetLogFormat` call removed the card is empty. Advisor review: MINOR (untested wiring - now manually verified; Deslop find-similar skipped by the worker; doc wording).
+- Correction: the task note (and the orchestrator's brief) claimed auto+nginx flagged every request as a threat. Wrong: the combined parser sets Router to "server", so unrouted mode found nothing and the threat card was empty. Docs written to the real symptom.
+- PATTERN: [verification] - Check a bug's stated symptom against the real data path before writing docs or briefs; a manual run disproved the "every request is a threat" claim in one step.
+- PATTERN: [design] - Hand the server a value snapshot (parser.Format) set before Start rather than the *Parser, so there is no race surface if detection ever moves to runtime.
+
+## 2026-10-11 - Phase 1 collapsed
+
+All six Phase 1 tasks DONE; table moved to TASKS-archive.md.

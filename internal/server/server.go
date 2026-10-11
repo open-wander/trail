@@ -18,6 +18,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/basicauth"
 	"github.com/gofiber/fiber/v2/middleware/filesystem"
 	"github.com/open-wander/trail/internal/config"
+	"github.com/open-wander/trail/internal/parser"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -31,7 +32,12 @@ type Server struct {
 	overviewTmpl *template.Template
 	securityTmpl *template.Template
 	staticFS     fs.FS
+	logFormat    parser.Format
 }
+
+// SetLogFormat sets the effective log format, normally the one the parser
+// detected at startup. It is unsynchronised and must be called before Start.
+func (s *Server) SetLogFormat(f parser.Format) { s.logFormat = f }
 
 // New creates a new Server instance with the given configuration and database.
 // templatesFS and staticFS are embedded filesystems rooted at the project root
@@ -115,6 +121,7 @@ func New(cfg *config.Config, database *sql.DB, templatesFS, staticFS fs.FS) (*Se
 		overviewTmpl: overviewTmpl,
 		securityTmpl: securityTmpl,
 		staticFS:     staticSub,
+		logFormat:    parser.ParseFormat(cfg.LogFormat),
 	}
 
 	// Configure middleware and routes

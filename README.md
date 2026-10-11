@@ -67,6 +67,8 @@ All configuration is via environment variables:
 | `TRAIL_AUTH_PASS` | | Basic auth password |
 | `TRAIL_GEOIP_PATH` | | Path to GeoIP mmdb file (optional, enables country panel) |
 
+`auto` detects the format from the first lines of the log at startup. If the log is empty or missing then, the security view looks for Traefik's unrouted traffic and its threat card stays empty until restart, so set `TRAIL_LOG_FORMAT=combined` explicitly for nginx-style logs that may not exist yet.
+
 Authentication priority: htpasswd file > env var credentials > no auth.
 
 ### Log format

@@ -82,6 +82,8 @@ export TRAIL_GEOIP_PATH=/usr/share/geoip/dbip-country-lite.mmdb
 | `TRAIL_AUTH_PASS` | | Basic auth password (plaintext) |
 | `TRAIL_GEOIP_PATH` | | Path to MaxMind/DB-IP mmdb file |
 
+`auto` detects the format from the first lines of the log at startup. If the log is empty or missing then, the security view looks for Traefik's unrouted traffic and its threat card stays empty until restart, so set `TRAIL_LOG_FORMAT=combined` explicitly for nginx-style logs that may not exist yet.
+
 **Authentication Priority:**
 1. htpasswd file (if set)
 2. Environment variables (if set)
