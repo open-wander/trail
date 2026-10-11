@@ -609,3 +609,81 @@ func TestNewNilParserAcceptsTraefikJSON(t *testing.T) {
 		}
 	}
 }
+
+func TestRunFlushesBufferedEntriesOnShutdown(t *testing.T) {
+	db := testDB(t)
+	a := New(db, nil, "")
+	// Keep the ticker from flushing before shutdown.
+	a.flushInterval = time.Hour
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Unbuffered: each send completes only once Run has received the line, so
+	// all entries are buffered before the cancellation can be observed.
+	lines := make(chan string)
+	errCh := make(chan error, 1)
+	go func() { errCh <- a.Run(ctx, lines) }()
+
+	const n = 3
+	for range n {
+		lines <- `91.34.143.167 - - [07/Jan/2026:16:17:08 +0000] "GET / HTTP/1.1" 200 5 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" 1 "web@docker" "http://172.19.0.4:80" 1ms`
+	}
+
+	cancel()
+
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatalf("Run returned %v, want nil", err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("Run did not return after cancel")
+	}
+
+	var total int
+	if err := db.QueryRow(`SELECT COALESCE(SUM(count), 0) FROM requests`).Scan(&total); err != nil {
+		t.Fatalf("query requests: %v", err)
+	}
+	if total != n {
+		t.Errorf("requests count = %d, want %d", total, n)
+	}
+}
+
+func TestRunFlushesOnChannelCloseWithCancelledContext(t *testing.T) {
+	// With the context cancelled and the channel closed, both select cases are
+	// ready and Go picks one at random. Repeat so the channel-closed branch is
+	// exercised (a miss across all rounds has probability 2^-50).
+	for round := range 50 {
+		db := testDB(t)
+		a := New(db, nil, "")
+		a.flushInterval = time.Hour
+
+		ctx, cancel := context.WithCancel(context.Background())
+		lines := make(chan string)
+		errCh := make(chan error, 1)
+		go func() { errCh <- a.Run(ctx, lines) }()
+
+		lines <- `91.34.143.167 - - [07/Jan/2026:16:17:08 +0000] "GET / HTTP/1.1" 200 5 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" 1 "web@docker" "http://172.19.0.4:80" 1ms`
+
+		cancel()
+		close(lines)
+
+		select {
+		case err := <-errCh:
+			if err != nil {
+				t.Fatalf("round %d: Run returned %v, want nil", round, err)
+			}
+		case <-time.After(10 * time.Second):
+			t.Fatalf("round %d: Run did not return", round)
+		}
+
+		var total int
+		if err := db.QueryRow(`SELECT COALESCE(SUM(count), 0) FROM requests`).Scan(&total); err != nil {
+			t.Fatalf("round %d: query requests: %v", round, err)
+		}
+		if total != 1 {
+			t.Fatalf("round %d: requests count = %d, want 1", round, total)
+		}
+	}
+}

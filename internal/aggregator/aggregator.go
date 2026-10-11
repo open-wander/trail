@@ -20,6 +20,10 @@ import (
 const (
 	defaultFlushInterval = 10 * time.Second
 	bufferSizeThreshold  = 1000
+
+	// shutdownFlushTimeout bounds the final flush, which runs after the run
+	// context is already cancelled.
+	shutdownFlushTimeout = 5 * time.Second
 )
 
 // Aggregator batches log entries in memory and periodically flushes to SQLite
@@ -142,6 +146,14 @@ func New(db *sql.DB, p *parser.Parser, geoDBPath string) *Aggregator {
 	}
 }
 
+// flushOnShutdown flushes with a fresh, bounded context: the run context is
+// normally already cancelled when the final flush happens.
+func (a *Aggregator) flushOnShutdown() error {
+	ctx, cancel := context.WithTimeout(context.Background(), shutdownFlushTimeout)
+	defer cancel()
+	return a.flush(ctx)
+}
+
 // Run processes log lines from the channel, accumulating in memory and flushing periodically
 func (a *Aggregator) Run(ctx context.Context, lines <-chan string) error {
 	ticker := time.NewTicker(a.flushInterval)
@@ -151,7 +163,7 @@ func (a *Aggregator) Run(ctx context.Context, lines <-chan string) error {
 		select {
 		case <-ctx.Done():
 			// Flush remaining buffer before returning
-			if err := a.flush(ctx); err != nil {
+			if err := a.flushOnShutdown(); err != nil {
 				log.Printf("error flushing on shutdown: %v", err)
 				return err
 			}
@@ -166,7 +178,7 @@ func (a *Aggregator) Run(ctx context.Context, lines <-chan string) error {
 		case line, ok := <-lines:
 			if !ok {
 				// Channel closed, flush and return
-				if err := a.flush(ctx); err != nil {
+				if err := a.flushOnShutdown(); err != nil {
 					log.Printf("error flushing on channel close: %v", err)
 					return err
 				}

@@ -107,7 +107,9 @@ func main() {
 		}
 	}()
 
+	aggDone := make(chan struct{})
 	go func() {
+		defer close(aggDone)
 		if err := agg.Run(ctx, lines); err != nil {
 			if err != context.Canceled {
 				log.Printf("Aggregator error: %v", err)
@@ -146,6 +148,13 @@ func main() {
 	// Shutdown server with timeout
 	if err := srv.Shutdown(); err != nil {
 		log.Printf("Server shutdown error: %v", err)
+	}
+
+	// Wait for the aggregator final flush before the database is closed
+	select {
+	case <-aggDone:
+	case <-time.After(10 * time.Second):
+		log.Printf("aggregator did not finish flushing before timeout")
 	}
 
 	// Give goroutines a moment to finish cleanup
