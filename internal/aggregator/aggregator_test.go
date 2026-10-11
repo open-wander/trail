@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"maps"
 	"strings"
 	"testing"
 	"time"
@@ -951,6 +952,98 @@ func TestFailedFlushKeepsBatch(t *testing.T) {
 	}
 	if got := queryInt(t, db, `SELECT SUM(count) FROM duration_hist`); got != n {
 		t.Errorf("duration_hist total = %d, want %d", got, n)
+	}
+	if got := bufferedSize(a); got != 0 {
+		t.Errorf("bufferSize after good flush = %d, want 0", got)
+	}
+}
+
+// uaLine returns a CLF line like chromeLine but with the referer and user
+// agent chosen by the caller.
+func uaLine(ip, path, referer, ua string) string {
+	return fmt.Sprintf(`%s - - [07/Jan/2026:16:17:08 +0000] "GET %s HTTP/1.1" 200 5 "%s" "%s" 1 "web@docker" "http://172.19.0.4:80" 3ms`, ip, path, referer, ua)
+}
+
+const (
+	uaChromeWin = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+	uaFirefoxLx = "Mozilla/5.0 (X11; Linux x86_64; rv:120.0) Gecko/20100101 Firefox/120.0"
+	uaSafariIOS = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+)
+
+// keyCounts reads a (key, count) breakdown table into a map, summing across
+// hours and routers.
+func keyCounts(t *testing.T, db *sql.DB, q string) map[string]int {
+	t.Helper()
+	rows, err := db.Query(q)
+	if err != nil {
+		t.Fatalf("query %q: %v", q, err)
+	}
+	defer rows.Close()
+	got := map[string]int{}
+	for rows.Next() {
+		var k string
+		var n int
+		if err := rows.Scan(&k, &n); err != nil {
+			t.Fatalf("scan %q: %v", q, err)
+		}
+		got[k] += n
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("rows %q: %v", q, err)
+	}
+	return got
+}
+
+func TestFailedFlushKeepsBreakdowns(t *testing.T) {
+	db := testDB(t)
+	a := New(db, nil, "")
+	captureLog(t)
+
+	for i := range 3 {
+		a.handleLine(uaLine(fmt.Sprintf("10.0.0.%d", i), "/a", "https://example.com/x", uaChromeWin))
+	}
+	for i := range 2 {
+		a.handleLine(uaLine(fmt.Sprintf("10.0.1.%d", i), "/a", "https://other.org/", uaFirefoxLx))
+	}
+	a.handleLine(uaLine("10.0.2.0", "/a", "-", uaSafariIOS))
+
+	// No GeoIP DB in tests, so seed the countries buffer directly.
+	a.mu.Lock()
+	a.countries[countryKey{Hour: "2026-01-07T16", Router: "web@docker", Country: "NL"}] = 2
+	a.mu.Unlock()
+
+	breakRequests(t, db)
+	if err := a.flush(context.Background()); err == nil {
+		t.Fatal("flush succeeded against a missing table")
+	}
+	fixRequests(t, db)
+	for _, tbl := range []string{"referrers", "browsers", "os_stats", "countries"} {
+		if got := queryInt(t, db, `SELECT COUNT(*) FROM `+tbl); got != 0 {
+			t.Errorf("%s rows written by failed flush = %d, want 0", tbl, got)
+		}
+	}
+
+	// A line on keys the restored batch already holds: the retry must write
+	// the restored and new counts together.
+	a.handleLine(uaLine("10.0.0.9", "/a", "https://example.com/x", uaChromeWin))
+
+	if err := a.flush(context.Background()); err != nil {
+		t.Fatalf("retry flush: %v", err)
+	}
+	checks := []struct {
+		table string
+		q     string
+		want  map[string]int
+	}{
+		{"referrers", `SELECT referrer, count FROM referrers`, map[string]int{"example.com": 4, "other.org": 2}},
+		{"browsers", `SELECT browser, count FROM browsers`, map[string]int{"Chrome": 4, "Firefox": 2, "Safari": 1}},
+		{"os_stats", `SELECT os, count FROM os_stats`, map[string]int{"Windows": 4, "Linux": 2, "iOS": 1}},
+		{"countries", `SELECT country, count FROM countries`, map[string]int{"NL": 2}},
+	}
+	for _, c := range checks {
+		if got := keyCounts(t, db, c.q); !maps.Equal(got, c.want) {
+			t.Errorf("%s = %v, want %v", c.table, got, c.want)
+		}
 	}
 	if got := bufferedSize(a); got != 0 {
 		t.Errorf("bufferSize after good flush = %d, want 0", got)

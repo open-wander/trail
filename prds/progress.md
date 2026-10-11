@@ -120,3 +120,12 @@ Invariants (overlay mutations, tree never touched): swept 8: 4 guarded, 3 confir
 - BUG (not a coverage gap): env-credential auth fails open. `TRAIL_AUTH_USER` set with `TRAIL_AUTH_PASS` empty or unset (or the reverse) is treated as "no auth configured": the dashboard is served without auth and only `auth=none` is logged at INFO. Same class as 2.2. Fix: one of the pair set without the other is a startup error.
 
 Comments: no task/phase identifiers, norman scaffolding or directive comments in the Phase 2 files; no edits.
+
+## 2026-10-11 - Phase 4 batch A: tasks 4.1, 4.2, 4.3
+
+- 4.1: `Config.ValidateEnvAuth` (one rule, called from `config.Load` and `createAuthMiddleware`). Half-set or blank env credentials are a startup error, including alongside htpasswd; errors name the variable, never the value. README/INSTALL updated. Advisor review: PASS. Breaking for any deployment that ran with one variable set - those were serving the dashboard unauthenticated.
+- 4.2: wrong-password and unknown-user cases added to `TestNewHtpasswdStartup`. Advisor review: MINOR - the spec's literal mutant `!exists && false` is equivalent (users[unknown] is "" and verifyPassword("") is false), so the worker substituted a hash-borrowing mutant.
+- 4.3: `TestFailedFlushKeepsBreakdowns`. Advisor review: MINOR - a comment claimed the overlapping line catches assign-instead-of-add in the merge; false, because restore merges into empty buffers inside flush. Comment corrected by the orchestrator.
+- Orchestrator verification: `go test -race ./...` green; overlay mutations all red (Load check removed, server check removed, blank allowed, Authorizer accepts all, each of four merge loops removed). Smoke run: half-set pair exits 1 with one JSON line and no password.
+- PATTERN: [testing] - Check a specified mutant is not equivalent before demanding it go red: a missing-map-key branch whose zero value already fails the next check cannot be detected.
+- PATTERN: [security] - Put a fail-closed rule in one function called from both the config layer and the component that enforces it, so the two cannot drift.
