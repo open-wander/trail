@@ -36,7 +36,7 @@ type Server struct {
 // New creates a new Server instance with the given configuration and database.
 // templatesFS and staticFS are embedded filesystems rooted at the project root
 // (i.e. containing "templates/" and "static/" subdirectories).
-func New(cfg *config.Config, database *sql.DB, templatesFS, staticFS fs.FS) *Server {
+func New(cfg *config.Config, database *sql.DB, templatesFS, staticFS fs.FS) (*Server, error) {
 	app := fiber.New(fiber.Config{
 		AppName:               "Trail Analytics",
 		DisableStartupMessage: false,
@@ -118,34 +118,41 @@ func New(cfg *config.Config, database *sql.DB, templatesFS, staticFS fs.FS) *Ser
 	}
 
 	// Configure middleware and routes
-	s.setupMiddleware()
+	if err := s.setupMiddleware(); err != nil {
+		return nil, err
+	}
 	s.setupRoutes()
 
-	return s
+	return s, nil
 }
 
 // setupMiddleware configures middleware for the application
-func (s *Server) setupMiddleware() {
+func (s *Server) setupMiddleware() error {
 	// Static file serving from embedded filesystem
 	s.app.Use("/static", filesystem.New(filesystem.Config{
 		Root: http.FS(s.staticFS),
 	}))
 
 	// Basic auth middleware (if configured)
-	if authMiddleware := s.createAuthMiddleware(); authMiddleware != nil {
+	authMiddleware, err := s.createAuthMiddleware()
+	if err != nil {
+		return err
+	}
+	if authMiddleware != nil {
 		s.app.Use(authMiddleware)
 	}
+	return nil
 }
 
 // createAuthMiddleware creates basic auth middleware based on configuration
-// Returns nil if no authentication is configured
-func (s *Server) createAuthMiddleware() fiber.Handler {
+// Returns nil if no authentication is configured. A configured htpasswd file
+// that cannot be used is an error: never fall back to serving without auth.
+func (s *Server) createAuthMiddleware() (fiber.Handler, error) {
 	// Priority 1: htpasswd file
 	if s.config.HtpasswdFile != "" {
 		users, err := parseHtpasswd(s.config.HtpasswdFile)
 		if err != nil {
-			log.Printf("Warning: Failed to parse htpasswd file: %v", err)
-			return nil
+			return nil, fmt.Errorf("htpasswd file %q: %w", s.config.HtpasswdFile, err)
 		}
 
 		return basicauth.New(basicauth.Config{
@@ -156,7 +163,7 @@ func (s *Server) createAuthMiddleware() fiber.Handler {
 				}
 				return verifyPassword(pass, hashedPass)
 			},
-		})
+		}), nil
 	}
 
 	// Priority 2: environment variable credentials
@@ -165,11 +172,11 @@ func (s *Server) createAuthMiddleware() fiber.Handler {
 			Users: map[string]string{
 				s.config.AuthUser: s.config.AuthPass,
 			},
-		})
+		}), nil
 	}
 
 	// No authentication configured
-	return nil
+	return nil, nil
 }
 
 // parseHtpasswd reads and parses an htpasswd file

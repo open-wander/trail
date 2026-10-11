@@ -1,9 +1,15 @@
 package server
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/open-wander/trail"
+	"github.com/open-wander/trail/internal/config"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -175,4 +181,94 @@ func indexOf(s, substr string) int {
 		}
 	}
 	return -1
+}
+
+func TestNewHtpasswdStartup(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name, content string) string {
+		p := filepath.Join(dir, name)
+		if err := os.WriteFile(p, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte("secret"), bcrypt.MinCost)
+	if err != nil {
+		t.Fatal(err)
+	}
+	missing := filepath.Join(dir, "nope")
+	noUsers := write("nousers", "# comment\nnocolonline\nbob:$apr1$abc$def\n")
+	valid := write("valid", "alice:"+string(hash)+"\n")
+
+	tests := []struct {
+		name     string
+		cfg      config.Config
+		wantErr  string // substring; empty means no error expected
+		wantAuth bool   // when started: requests without credentials get 401
+	}{
+		{name: "missing file", cfg: config.Config{HtpasswdFile: missing}, wantErr: missing},
+		{name: "unreadable (directory)", cfg: config.Config{HtpasswdFile: dir}, wantErr: dir},
+		{name: "no valid users", cfg: config.Config{HtpasswdFile: noUsers}, wantErr: "no valid users"},
+		{name: "no valid users path named", cfg: config.Config{HtpasswdFile: noUsers}, wantErr: noUsers},
+		{
+			name:    "broken htpasswd does not fall back to env creds",
+			cfg:     config.Config{HtpasswdFile: missing, AuthUser: "u", AuthPass: "p"},
+			wantErr: missing,
+		},
+		{name: "valid file", cfg: config.Config{HtpasswdFile: valid}, wantAuth: true},
+		{name: "no auth configured", cfg: config.Config{}},
+		{name: "env creds", cfg: config.Config{AuthUser: "u", AuthPass: "p"}, wantAuth: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := tt.cfg
+			srv, err := New(&cfg, nil, trail.TemplatesFS, trail.StaticFS)
+			if tt.wantErr != "" {
+				if err == nil {
+					t.Fatalf("expected startup error containing %q, got nil", tt.wantErr)
+				}
+				if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("error %q does not contain %q", err, tt.wantErr)
+				}
+				if srv != nil {
+					t.Fatal("server must be nil on error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			// /static is mounted before auth, so probe an API route.
+			status := func(user, pass string) int {
+				req := httptest.NewRequest("GET", "/api/filters", nil)
+				if user != "" {
+					req.SetBasicAuth(user, pass)
+				}
+				r, err := srv.app.Test(req)
+				if err != nil {
+					return http.StatusInternalServerError
+				}
+				return r.StatusCode
+			}
+
+			got := status("", "")
+			if tt.wantAuth {
+				if got != http.StatusUnauthorized {
+					t.Fatalf("no-credentials status = %d, want %d", got, http.StatusUnauthorized)
+				}
+				user, pass := "alice", "secret"
+				if tt.cfg.AuthUser != "" {
+					user, pass = tt.cfg.AuthUser, tt.cfg.AuthPass
+				}
+				if c := status(user, pass); c == http.StatusUnauthorized {
+					t.Fatalf("valid credentials still got 401")
+				}
+			} else if got == http.StatusUnauthorized {
+				t.Fatalf("no auth configured but request got 401")
+			}
+		})
+	}
 }

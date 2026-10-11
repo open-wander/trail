@@ -55,6 +55,13 @@ func main() {
 	}
 	defer database.Close()
 
+	// Build the server before any import work so a broken htpasswd file
+	// fails startup immediately instead of after a long backfill.
+	srv, err := server.New(cfg, database, trail.TemplatesFS, trail.StaticFS)
+	if err != nil {
+		log.Fatalf("Failed to configure server: %v", err)
+	}
+
 	// Create parser with configured format
 	p := parser.NewParser(cfg.LogFormat)
 
@@ -82,7 +89,6 @@ func main() {
 	tail := tailer.New(cfg.LogFile, database)
 	agg := aggregator.New(database, p, cfg.GeoIPPath)
 	cleaner := retention.New(database, cfg.RetentionDays)
-	srv := server.New(cfg, database, trail.TemplatesFS, trail.StaticFS)
 
 	// Create root context with cancel
 	ctx, cancel := context.WithCancel(context.Background())
