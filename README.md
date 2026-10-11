@@ -47,7 +47,7 @@ TRAIL_LISTEN=:8080 \
 ./trail
 ```
 
-Open http://localhost:8080. No auth is required when `TRAIL_AUTH_USER` and `TRAIL_HTPASSWD_FILE` are both unset.
+Open http://localhost:8080. No auth is required when `TRAIL_AUTH_USER`, `TRAIL_AUTH_PASS` and `TRAIL_HTPASSWD_FILE` are all unset.
 
 Trail will tail the log file, backfill existing data, then stream new entries. The dashboard populates as data is ingested.
 
@@ -70,7 +70,7 @@ All configuration is via environment variables:
 
 `auto` detects the format from the first lines of the log at startup. If the log is empty or missing then, the security view looks for Traefik's unrouted traffic and its threat card stays empty until restart, so set `TRAIL_LOG_FORMAT=combined` explicitly for nginx-style logs that may not exist yet.
 
-Authentication priority: htpasswd file > env var credentials > no auth.
+Authentication priority: htpasswd file > env var credentials > no auth. `TRAIL_AUTH_USER` and `TRAIL_AUTH_PASS` must be set together; setting only one (or a blank value) is a startup error.
 
 ### Log format
 

@@ -168,9 +168,15 @@ func (s *Server) setupMiddleware() error {
 }
 
 // createAuthMiddleware creates basic auth middleware based on configuration
-// Returns nil if no authentication is configured. A configured htpasswd file
-// that cannot be used is an error: never fall back to serving without auth.
+// Returns nil only when nothing is configured. A configured htpasswd file that
+// cannot be used, or a half-set env credential pair, is an error: never fall
+// back to serving without auth.
 func (s *Server) createAuthMiddleware() (fiber.Handler, error) {
+	// Same rule as config.Load, so New fails closed even without Load.
+	if err := s.config.ValidateEnvAuth(); err != nil {
+		return nil, err
+	}
+
 	// Priority 1: htpasswd file
 	if s.config.HtpasswdFile != "" {
 		users, err := parseHtpasswd(s.config.HtpasswdFile)
@@ -189,7 +195,7 @@ func (s *Server) createAuthMiddleware() (fiber.Handler, error) {
 		}), nil
 	}
 
-	// Priority 2: environment variable credentials
+	// Priority 2: environment variable credentials (validated: both or neither)
 	if s.config.AuthUser != "" && s.config.AuthPass != "" {
 		return basicauth.New(basicauth.Config{
 			Users: map[string]string{

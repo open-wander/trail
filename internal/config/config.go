@@ -1,9 +1,11 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 )
 
 // Config holds all application configuration
@@ -49,7 +51,34 @@ func Load() (*Config, error) {
 	}
 	cfg.RetentionDays = retentionDays
 
+	if err := cfg.ValidateEnvAuth(); err != nil {
+		return nil, err
+	}
+
 	return cfg, nil
+}
+
+// ValidateEnvAuth rejects a half-set or blank TRAIL_AUTH_USER/TRAIL_AUTH_PASS
+// pair, which would otherwise leave the dashboard open. "Set" means non-empty;
+// values are never trimmed for use, so padded passwords still work. The check
+// applies even when TRAIL_HTPASSWD_FILE is set: a half-set pair next to a valid
+// htpasswd file signals a broken deployment. Errors never contain the values.
+func (c *Config) ValidateEnvAuth() error {
+	for _, v := range []struct{ name, val string }{
+		{"TRAIL_AUTH_USER", c.AuthUser},
+		{"TRAIL_AUTH_PASS", c.AuthPass},
+	} {
+		if v.val != "" && strings.TrimSpace(v.val) == "" {
+			return fmt.Errorf("%s is set but blank", v.name)
+		}
+	}
+	switch {
+	case c.AuthUser != "" && c.AuthPass == "":
+		return errors.New("TRAIL_AUTH_USER and TRAIL_AUTH_PASS must be set together (TRAIL_AUTH_PASS is empty)")
+	case c.AuthUser == "" && c.AuthPass != "":
+		return errors.New("TRAIL_AUTH_USER and TRAIL_AUTH_PASS must be set together (TRAIL_AUTH_USER is empty)")
+	}
+	return nil
 }
 
 // getEnvOrDefault returns the environment variable value or the default if not set

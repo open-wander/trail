@@ -91,6 +91,8 @@ export TRAIL_GEOIP_PATH=/usr/share/geoip/dbip-country-lite.mmdb
 2. Environment variables (if set)
 3. No authentication (if neither is set)
 
+`TRAIL_AUTH_USER` and `TRAIL_AUTH_PASS` must be set together; setting only one (or a blank value) is a startup error, even when an htpasswd file is configured.
+
 ## Running Trail
 
 ### Quick Start (No Auth)

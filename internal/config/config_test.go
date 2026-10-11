@@ -2,8 +2,56 @@ package config
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
+
+func TestLoadEnvAuthPair(t *testing.T) {
+	pass := "p@ss-" + "9f3a1c7e5b2d"
+	tests := []struct {
+		name      string
+		user      string
+		pass      string
+		htpasswd  string
+		wantErr   bool
+		wantInErr string
+	}{
+		{name: "user only", user: "admin", wantErr: true, wantInErr: "TRAIL_AUTH_PASS"},
+		{name: "pass only", pass: pass, wantErr: true, wantInErr: "TRAIL_AUTH_USER"},
+		{name: "user only with htpasswd", user: "admin", htpasswd: "/etc/htpasswd", wantErr: true, wantInErr: "TRAIL_AUTH_PASS"},
+		{name: "pass only with htpasswd", pass: pass, htpasswd: "/etc/htpasswd", wantErr: true, wantInErr: "TRAIL_AUTH_USER"},
+		{name: "blank pass", user: "admin", pass: "   ", wantErr: true, wantInErr: "TRAIL_AUTH_PASS"},
+		{name: "both blank", user: " ", pass: "\n", wantErr: true, wantInErr: "blank"},
+		{name: "both set", user: "admin", pass: pass},
+		{name: "neither set"},
+		{name: "htpasswd only", htpasswd: "/etc/htpasswd"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("TRAIL_AUTH_USER", tt.user)
+			t.Setenv("TRAIL_AUTH_PASS", tt.pass)
+			t.Setenv("TRAIL_HTPASSWD_FILE", tt.htpasswd)
+			t.Setenv("TRAIL_RETENTION_DAYS", "")
+
+			_, err := Load()
+			if !tt.wantErr {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), tt.wantInErr) {
+				t.Errorf("error %q does not mention %q", err, tt.wantInErr)
+			}
+			if tt.pass != "" && strings.Contains(err.Error(), tt.pass) {
+				t.Errorf("error leaks the password value: %q", err)
+			}
+		})
+	}
+}
 
 func TestLoad(t *testing.T) {
 	tests := []struct {
