@@ -73,3 +73,15 @@ Comments: no task/phase/requirement identifiers or norman scaffolding in the Pha
 - Deslop: `find-similar` unavailable in this repo (no deslop-lsp socket under .deslop/); duplication checked by grep instead.
 - PATTERN: [testing] - To make one select branch testable when ctx.Done is also ready, extract the case body to an unexported method and call it directly with a cancelled ctx; an injectable ticker does not help because select still picks at random.
 - PATTERN: [testing] - To catch a skip-after-timeout regression, hold the blocked state longer than (unsent lines x plausible skip interval) and assert the call has not returned.
+
+## 2026-10-11 - Task 3.3: a failed flush keeps its batch and Run keeps going
+
+- Changes: `internal/aggregator/aggregator.go` (`snapshot`, `takeSnapshotLocked`, `writeSnapshot`, `restore`; `maxBufferedEntries`/`maxBuffered` cap; `flushFailed` throttle; `onTick`/`onLine` log instead of returning), `internal/aggregator/aggregator_test.go` (8 new tests, `captureLog` helper; the two AfterCancel tests now also assert no flush was attempted).
+- Advisor plan: REVISE. A failed threshold flush leaves bufferSize >= threshold, so every later line would retry and log (retry storm) and the cap would trip within seconds; added the `flushFailed` throttle so only the ticker retries. Also: with merge-back the AfterCancel tests became vacuous (nil error no longer proves the guard), so they now assert no flush attempt via captured logs. Never force failure by closing a `:memory:` DB (MaxOpenConns 1 destroys it); rename a table instead.
+- Verification: `go test -race -count=10` and full suite green; gosec clean on the package. Orchestrator overlay mutations, all red: restore removed, cap removed, throttle removed, `return err` in onTick, `return err` in onLine, `flushFailed` never cleared, visitors not merged. Advisor review: MINOR (cap is approximate - comment added; dead `_ = logs` - removed).
+- PATTERN: [resilience] - Keep-and-retry needs a retry throttle: a buffer that stays over its flush threshold after a failure re-triggers the flush on every input.
+- PATTERN: [testing] - When a fix changes what an error return means, re-check every test whose only assertion is "returned nil"; add a second observable (here: no flush attempted) so the guard stays mutation-tested.
+
+## 2026-10-11 - Phase 3 collapsed
+
+All three Phase 3 tasks DONE; table moved to TASKS-archive.md. No separate sweep: the phase was itself the Phase 1 sweep follow-up and every task was mutation-checked by the orchestrator.

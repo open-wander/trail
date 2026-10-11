@@ -1,8 +1,13 @@
 package aggregator
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
+	"fmt"
+	"log"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -714,11 +719,15 @@ func TestOnLineThresholdAfterCancelKeepsEntries(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	// This line reaches the threshold after cancellation. A nil error is the
-	// guard's real contract: a flush on a cancelled ctx fails and would make
-	// Run exit before the shutdown flush.
+	// This line reaches the threshold after cancellation. A failed flush is
+	// restored and not returned, so a nil error no longer proves the guard:
+	// assert that no flush was attempted at all.
+	logs := captureLog(t)
 	if err := a.onLine(ctx, clfCurlLine); err != nil {
 		t.Fatalf("onLine returned %v, want nil", err)
+	}
+	if strings.Contains(logs.String(), "error during") {
+		t.Errorf("flush attempted after cancel: %s", logs.String())
 	}
 	if got := bufferedSize(a); got != bufferSizeThreshold {
 		t.Errorf("bufferSize = %d, want %d (buffer must be kept for the shutdown flush)", got, bufferSizeThreshold)
@@ -738,9 +747,13 @@ func TestOnTickAfterCancelKeepsEntries(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	// A nil error is the guard's real contract (see the threshold test).
+	// No flush attempt is the guard's real contract (see the threshold test).
+	logs := captureLog(t)
 	if err := a.onTick(ctx); err != nil {
 		t.Fatalf("onTick returned %v, want nil", err)
+	}
+	if strings.Contains(logs.String(), "error during") {
+		t.Errorf("flush attempted after cancel: %s", logs.String())
 	}
 	if got := bufferedSize(a); got != n {
 		t.Errorf("bufferSize = %d, want %d (buffer must be kept for the shutdown flush)", got, n)
@@ -783,5 +796,345 @@ func TestRunFlushesOnChannelCloseWithCancelledContext(t *testing.T) {
 		if total != 1 {
 			t.Fatalf("round %d: requests count = %d, want 1", round, total)
 		}
+	}
+}
+
+// captureLog redirects the standard logger into a buffer for the test. Read
+// it only once the code under test has stopped writing.
+func captureLog(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+	return &buf
+}
+
+// chromeLine returns a CLF line from a human browser at ip requesting path.
+func chromeLine(ip, path string) string {
+	return fmt.Sprintf(`%s - - [07/Jan/2026:16:17:08 +0000] "GET %s HTTP/1.1" 200 5 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" 1 "web@docker" "http://172.19.0.4:80" 3ms`, ip, path)
+}
+
+// breakRequests makes every flush fail by renaming the requests table away.
+// The DB is :memory: with one connection, so closing it is not an option.
+// Only call it while no transaction is open.
+func breakRequests(t *testing.T, db *sql.DB) {
+	t.Helper()
+	if _, err := db.Exec(`ALTER TABLE requests RENAME TO requests_off`); err != nil {
+		t.Fatalf("break requests: %v", err)
+	}
+}
+
+func fixRequests(t *testing.T, db *sql.DB) {
+	t.Helper()
+	if _, err := db.Exec(`ALTER TABLE requests_off RENAME TO requests`); err != nil {
+		t.Fatalf("fix requests: %v", err)
+	}
+}
+
+func queryInt(t *testing.T, db *sql.DB, q string, args ...any) int {
+	t.Helper()
+	var n int
+	if err := db.QueryRow(q, args...).Scan(&n); err != nil {
+		t.Fatalf("query %q: %v", q, err)
+	}
+	return n
+}
+
+type reqTotals struct{ count, bytes, duration int }
+
+func requestTotals(t *testing.T, db *sql.DB, path string) reqTotals {
+	t.Helper()
+	var r reqTotals
+	err := db.QueryRow(`SELECT COALESCE(SUM(count),0), COALESCE(SUM(bytes),0), COALESCE(SUM(duration),0) FROM requests WHERE path = ?`, path).
+		Scan(&r.count, &r.bytes, &r.duration)
+	if err != nil {
+		t.Fatalf("request totals: %v", err)
+	}
+	return r
+}
+
+func TestFailedFlushKeepsBatch(t *testing.T) {
+	db := testDB(t)
+	a := New(db, nil, "")
+	captureLog(t)
+
+	const n = 7
+	for i := range n {
+		a.handleLine(chromeLine(fmt.Sprintf("10.0.0.%d", i), "/a"))
+	}
+
+	breakRequests(t, db)
+	if err := a.flush(context.Background()); err == nil {
+		t.Fatal("flush succeeded against a missing table")
+	}
+	if got := bufferedSize(a); got != n {
+		t.Errorf("bufferSize after failed flush = %d, want %d", got, n)
+	}
+	fixRequests(t, db)
+	if got := queryInt(t, db, `SELECT COUNT(*) FROM requests`); got != 0 {
+		t.Errorf("rows written by failed flush = %d, want 0", got)
+	}
+	if got := queryInt(t, db, `SELECT COUNT(*) FROM visitors`); got != 0 {
+		t.Errorf("visitor rows written by failed flush = %d, want 0", got)
+	}
+
+	if err := a.flush(context.Background()); err != nil {
+		t.Fatalf("retry flush: %v", err)
+	}
+	if got, want := requestTotals(t, db, "/a"), (reqTotals{n, n * 5, n * 3}); got != want {
+		t.Errorf("request totals = %+v, want %+v", got, want)
+	}
+	if got := queryInt(t, db, `SELECT COUNT(*) FROM visitors`); got != n {
+		t.Errorf("visitors = %d, want %d", got, n)
+	}
+	if got := queryInt(t, db, `SELECT SUM(count) FROM user_agents`); got != n {
+		t.Errorf("user_agents total = %d, want %d", got, n)
+	}
+	if got := queryInt(t, db, `SELECT SUM(count) FROM duration_hist`); got != n {
+		t.Errorf("duration_hist total = %d, want %d", got, n)
+	}
+	if got := bufferedSize(a); got != 0 {
+		t.Errorf("bufferSize after good flush = %d, want 0", got)
+	}
+}
+
+func TestFailedFlushMergesWithNewData(t *testing.T) {
+	db := testDB(t)
+	a := New(db, nil, "")
+	captureLog(t)
+
+	for i := range 3 {
+		a.handleLine(chromeLine(fmt.Sprintf("10.0.0.%d", i), "/a"))
+	}
+	breakRequests(t, db)
+	if err := a.flush(context.Background()); err == nil {
+		t.Fatal("flush succeeded against a missing table")
+	}
+	fixRequests(t, db)
+
+	// Overlapping request key and visitor (10.0.0.0), plus a new key and visitor.
+	a.handleLine(chromeLine("10.0.0.0", "/a"))
+	a.handleLine(chromeLine("10.0.0.9", "/b"))
+	if got := bufferedSize(a); got != 5 {
+		t.Fatalf("bufferSize = %d, want 5", got)
+	}
+
+	if err := a.flush(context.Background()); err != nil {
+		t.Fatalf("flush: %v", err)
+	}
+	if got, want := requestTotals(t, db, "/a"), (reqTotals{4, 20, 12}); got != want {
+		t.Errorf("/a totals = %+v, want %+v", got, want)
+	}
+	if got, want := requestTotals(t, db, "/b"), (reqTotals{1, 5, 3}); got != want {
+		t.Errorf("/b totals = %+v, want %+v", got, want)
+	}
+	if got := queryInt(t, db, `SELECT COUNT(*) FROM visitors`); got != 4 {
+		t.Errorf("visitors = %d, want 4 (shared visitor written once)", got)
+	}
+	if got := queryInt(t, db, `SELECT SUM(count) FROM user_agents`); got != 5 {
+		t.Errorf("user_agents total = %d, want 5", got)
+	}
+}
+
+func TestRunSurvivesThresholdFlushFailure(t *testing.T) {
+	db := testDB(t)
+	a := New(db, nil, "")
+	a.flushInterval = time.Hour
+	captureLog(t)
+	breakRequests(t, db)
+
+	lines := make(chan string)
+	errCh := make(chan error, 1)
+	go func() { errCh <- a.Run(context.Background(), lines) }()
+
+	for range bufferSizeThreshold {
+		lines <- clfCurlLine
+	}
+	// The threshold flush has failed by the time Run takes this line. Under
+	// the old behaviour Run has returned, so this send would never complete.
+	select {
+	case lines <- clfCurlLine:
+	case err := <-errCh:
+		t.Fatalf("Run returned %v after a failed threshold flush", err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("Run stopped receiving after a failed threshold flush")
+	}
+
+	fixRequests(t, db)
+	close(lines)
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatalf("Run returned %v, want nil", err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("Run did not return after channel close")
+	}
+	if got := queryInt(t, db, `SELECT COALESCE(SUM(count),0) FROM requests`); got != bufferSizeThreshold+1 {
+		t.Errorf("requests total = %d, want %d", got, bufferSizeThreshold+1)
+	}
+}
+
+func TestOnTickFailureKeepsRunningAndRetries(t *testing.T) {
+	db := testDB(t)
+	a := New(db, nil, "")
+	captureLog(t)
+	for range 3 {
+		a.handleLine(clfCurlLine)
+	}
+	breakRequests(t, db)
+	if err := a.onTick(context.Background()); err != nil {
+		t.Fatalf("onTick returned %v, want nil", err)
+	}
+	if got := bufferedSize(a); got != 3 {
+		t.Errorf("bufferSize = %d, want 3", got)
+	}
+	fixRequests(t, db)
+	if err := a.onTick(context.Background()); err != nil {
+		t.Fatalf("retry onTick: %v", err)
+	}
+	if got := queryInt(t, db, `SELECT COALESCE(SUM(count),0) FROM requests`); got != 3 {
+		t.Errorf("requests total = %d, want 3", got)
+	}
+}
+
+func TestThresholdRetriesAreThrottledAfterFailure(t *testing.T) {
+	db := testDB(t)
+	a := New(db, nil, "")
+	logs := captureLog(t)
+	breakRequests(t, db)
+
+	const n = bufferSizeThreshold + 50
+	for range n {
+		if err := a.onLine(context.Background(), clfCurlLine); err != nil {
+			t.Fatalf("onLine returned %v, want nil", err)
+		}
+	}
+	if got := strings.Count(logs.String(), "error during"); got != 1 {
+		t.Errorf("flush attempts = %d, want 1 (only a tick may retry)", got)
+	}
+	if got := bufferedSize(a); got != n {
+		t.Errorf("bufferSize = %d, want %d", got, n)
+	}
+
+	// A successful tick clears the throttle.
+	fixRequests(t, db)
+	if err := a.onTick(context.Background()); err != nil {
+		t.Fatalf("onTick: %v", err)
+	}
+	if got := queryInt(t, db, `SELECT COALESCE(SUM(count),0) FROM requests`); got != n {
+		t.Errorf("requests total = %d, want %d", got, n)
+	}
+	for range bufferSizeThreshold {
+		a.handleLine(clfCurlLine)
+	}
+	if err := a.onLine(context.Background(), clfCurlLine); err != nil {
+		t.Fatal(err)
+	}
+	if got := bufferedSize(a); got != 0 {
+		t.Errorf("bufferSize = %d, want 0 (threshold flush works again after recovery)", got)
+	}
+}
+
+func TestFailedFlushCap(t *testing.T) {
+	tests := []struct {
+		name        string
+		lines       int
+		wantSize    int
+		wantDropLog string
+	}{
+		{"at cap is kept", 5, 5, ""},
+		{"over cap is dropped", 6, 0, "dropped 6 entries"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db := testDB(t)
+			a := New(db, nil, "")
+			a.maxBuffered = 5
+			logs := captureLog(t)
+			for range tt.lines {
+				a.handleLine(clfCurlLine)
+			}
+			breakRequests(t, db)
+			if err := a.flush(context.Background()); err == nil {
+				t.Fatal("flush succeeded against a missing table")
+			}
+			if got := bufferedSize(a); got != tt.wantSize {
+				t.Errorf("bufferSize = %d, want %d", got, tt.wantSize)
+			}
+			if tt.wantDropLog == "" {
+				if strings.Contains(logs.String(), "dropped") {
+					t.Errorf("unexpected drop log: %s", logs.String())
+				}
+			} else if !strings.Contains(logs.String(), tt.wantDropLog) {
+				t.Errorf("log %q does not contain %q", logs.String(), tt.wantDropLog)
+			}
+		})
+	}
+}
+
+func TestRestoreCapCountsLiveBuffer(t *testing.T) {
+	a := New(testDB(t), nil, "")
+	a.maxBuffered = 5
+	logs := captureLog(t)
+
+	// Snapshot of 3 lines, then 3 more arrive while the flush is in flight.
+	for range 3 {
+		a.handleLine(clfCurlLine)
+	}
+	a.mu.Lock()
+	snap := a.takeSnapshotLocked()
+	a.mu.Unlock()
+	for range 3 {
+		a.handleLine(clfCurlLine)
+	}
+
+	a.restore(snap)
+	if got := bufferedSize(a); got != 3 {
+		t.Errorf("bufferSize = %d, want 3 (3+3 exceeds the cap, snapshot dropped)", got)
+	}
+	if !strings.Contains(logs.String(), "dropped 3 entries") {
+		t.Errorf("log %q does not report the drop", logs.String())
+	}
+}
+
+func TestRestoreMergesIntoLiveBuffer(t *testing.T) {
+	db := testDB(t)
+	a := New(db, nil, "")
+	captureLog(t)
+
+	for i := range 3 {
+		a.handleLine(chromeLine(fmt.Sprintf("10.0.0.%d", i), "/a"))
+	}
+	a.mu.Lock()
+	snap := a.takeSnapshotLocked()
+	a.mu.Unlock()
+
+	// Accumulated while the snapshot's write was in flight: one overlapping
+	// request key and visitor, one new of each.
+	a.handleLine(chromeLine("10.0.0.0", "/a"))
+	a.handleLine(chromeLine("10.0.0.9", "/b"))
+
+	a.restore(snap)
+	if got := bufferedSize(a); got != 5 {
+		t.Errorf("bufferSize = %d, want 5 (lines, not map entries)", got)
+	}
+	if err := a.flush(context.Background()); err != nil {
+		t.Fatalf("flush: %v", err)
+	}
+	if got, want := requestTotals(t, db, "/a"), (reqTotals{4, 20, 12}); got != want {
+		t.Errorf("/a totals = %+v, want %+v", got, want)
+	}
+	if got, want := requestTotals(t, db, "/b"), (reqTotals{1, 5, 3}); got != want {
+		t.Errorf("/b totals = %+v, want %+v", got, want)
+	}
+	if got := queryInt(t, db, `SELECT COUNT(*) FROM visitors`); got != 4 {
+		t.Errorf("visitors = %d, want 4", got)
+	}
+	if got := queryInt(t, db, `SELECT SUM(count) FROM user_agents`); got != 5 {
+		t.Errorf("user_agents total = %d, want 5", got)
+	}
+	if got := queryInt(t, db, `SELECT SUM(count) FROM duration_hist`); got != 5 {
+		t.Errorf("duration_hist total = %d, want 5", got)
 	}
 }

@@ -21,6 +21,16 @@ const (
 	defaultFlushInterval = 10 * time.Second
 	bufferSizeThreshold  = 1000
 
+	// maxBufferedEntries bounds the lines held in memory while flushes keep
+	// failing. bufferSize counts lines and each map gains at most one key per
+	// line, so this also bounds map entries: 100,000 lines at a few hundred
+	// bytes per key across 8 maps is tens of MB. At the default 10s tick it
+	// covers roughly 100 threshold-sized batches, enough for lock contention
+	// or a short disk-full spell. The bound is approximate: it is checked when
+	// a failed batch is merged back, so the live buffer can exceed it by up to
+	// one flush interval of traffic.
+	maxBufferedEntries = 100 * bufferSizeThreshold
+
 	// shutdownFlushTimeout bounds the final flush, which runs after the run
 	// context is already cancelled.
 	shutdownFlushTimeout = 5 * time.Second
@@ -33,6 +43,12 @@ type Aggregator struct {
 	flushInterval time.Duration
 	ipSalt        string
 	geoReader     *geoip2.Reader
+
+	// maxBuffered caps bufferSize after a failed flush is merged back.
+	maxBuffered int
+	// flushFailed is set while the last flush failed; onLine then leaves
+	// retries to onTick. It is only touched on the Run goroutine.
+	flushFailed bool
 
 	mu           sync.Mutex
 	requests     map[requestKey]*requestVal
@@ -133,6 +149,7 @@ func New(db *sql.DB, p *parser.Parser, geoDBPath string) *Aggregator {
 		db:            db,
 		parser:        p,
 		flushInterval: defaultFlushInterval,
+		maxBuffered:   maxBufferedEntries,
 		ipSalt:        salt,
 		geoReader:     geoReader,
 		requests:      make(map[requestKey]*requestVal),
@@ -163,9 +180,8 @@ func (a *Aggregator) Run(ctx context.Context, lines <-chan string) error {
 		select {
 		case <-ctx.Done():
 			// Process lines already queued, without blocking, then do one
-			// final flush. flush(ctx) is never used here: it resets the
-			// buffers before BeginTx, so a failure on a cancelled ctx would
-			// drop the entries.
+			// final flush. flush(ctx) is never used here: on the cancelled
+			// ctx it would fail, log an error and waste a transaction.
 		drain:
 			for {
 				select {
@@ -206,19 +222,21 @@ func (a *Aggregator) Run(ctx context.Context, lines <-chan string) error {
 	}
 }
 
-// onTick is Run's periodic flush case.
+// onTick is Run's periodic flush case. A failed flush is logged and not
+// returned: Run keeps aggregating and the next tick retries.
 func (a *Aggregator) onTick(ctx context.Context) error {
 	if ctx.Err() != nil {
 		return nil // shutdown path flushes
 	}
 	if err := a.flush(ctx); err != nil {
+		// The batch is kept; the next tick retries.
 		log.Printf("error during periodic flush: %v", err)
-		return err
 	}
 	return nil
 }
 
-// onLine is Run's line-received case.
+// onLine is Run's line-received case. Flush errors are logged, not returned
+// (see onTick).
 func (a *Aggregator) onLine(ctx context.Context, line string) error {
 	a.handleLine(line)
 
@@ -228,10 +246,11 @@ func (a *Aggregator) onLine(ctx context.Context, line string) error {
 	size := a.bufferSize
 	a.mu.Unlock()
 
-	if size >= bufferSizeThreshold && ctx.Err() == nil {
+	// After a failure only onTick retries, so a down database is not hit
+	// (and logged) once per incoming line.
+	if size >= bufferSizeThreshold && ctx.Err() == nil && !a.flushFailed {
 		if err := a.flush(ctx); err != nil {
 			log.Printf("error during buffer threshold flush: %v", err)
-			return err
 		}
 	}
 	return nil
@@ -357,21 +376,33 @@ func (a *Aggregator) accumulate(entry *parser.LogEntry) {
 	a.bufferSize++
 }
 
-// flush writes accumulated data to SQLite in a transaction
-func (a *Aggregator) flush(ctx context.Context) error {
-	a.mu.Lock()
-	// Take snapshots of all buffers
-	requests := a.requests
-	visitors := a.visitors
-	referrers := a.referrers
-	userAgents := a.userAgents
-	countries := a.countries
-	browsers := a.browsers
-	osStats := a.osStats
-	durationHist := a.durationHist
-	bufSize := a.bufferSize
+// snapshot is a batch of buffers taken out of the Aggregator for one flush.
+type snapshot struct {
+	requests     map[requestKey]*requestVal
+	visitors     map[visitorKey]struct{}
+	referrers    map[referrerKey]int
+	userAgents   map[userAgentKey]int
+	countries    map[countryKey]int
+	browsers     map[browserKey]int
+	osStats      map[osKey]int
+	durationHist map[durationHistKey]int
+	size         int
+}
 
-	// Reset buffers
+// takeSnapshotLocked moves the live buffers into a snapshot and resets them.
+// The caller must hold a.mu.
+func (a *Aggregator) takeSnapshotLocked() *snapshot {
+	s := &snapshot{
+		requests:     a.requests,
+		visitors:     a.visitors,
+		referrers:    a.referrers,
+		userAgents:   a.userAgents,
+		countries:    a.countries,
+		browsers:     a.browsers,
+		osStats:      a.osStats,
+		durationHist: a.durationHist,
+		size:         a.bufferSize,
+	}
 	a.requests = make(map[requestKey]*requestVal)
 	a.visitors = make(map[visitorKey]struct{})
 	a.referrers = make(map[referrerKey]int)
@@ -381,12 +412,87 @@ func (a *Aggregator) flush(ctx context.Context) error {
 	a.osStats = make(map[osKey]int)
 	a.durationHist = make(map[durationHistKey]int)
 	a.bufferSize = 0
+	return s
+}
+
+// restore merges a snapshot whose write failed back into the live buffers, so
+// the next flush retries it together with anything accumulated meanwhile.
+// If the merged buffer would exceed maxBuffered the snapshot is dropped
+// instead, so a permanently failing database cannot grow memory without limit.
+//
+// Known limit: if Commit reports an error after SQLite actually applied the
+// transaction, the retry double-counts that batch. This is rare with a local
+// SQLite file, so it is accepted rather than made exactly-once.
+func (a *Aggregator) restore(s *snapshot) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	if a.bufferSize+s.size > a.maxBuffered {
+		log.Printf("error: buffer cap of %d entries exceeded after failed flush, dropped %d entries", a.maxBuffered, s.size)
+		return
+	}
+
+	for k, v := range s.requests {
+		if cur, ok := a.requests[k]; ok {
+			cur.Count += v.Count
+			cur.Bytes += v.Bytes
+			cur.Duration += v.Duration
+		} else {
+			a.requests[k] = v
+		}
+	}
+	for k := range s.visitors {
+		a.visitors[k] = struct{}{}
+	}
+	for k, v := range s.referrers {
+		a.referrers[k] += v
+	}
+	for k, v := range s.userAgents {
+		a.userAgents[k] += v
+	}
+	for k, v := range s.countries {
+		a.countries[k] += v
+	}
+	for k, v := range s.browsers {
+		a.browsers[k] += v
+	}
+	for k, v := range s.osStats {
+		a.osStats[k] += v
+	}
+	for k, v := range s.durationHist {
+		a.durationHist[k] += v
+	}
+	a.bufferSize += s.size
+}
+
+// flush writes accumulated data to SQLite in a transaction. On failure the
+// batch is merged back into the live buffers (see restore) and the error is
+// returned.
+func (a *Aggregator) flush(ctx context.Context) error {
+	a.mu.Lock()
+	s := a.takeSnapshotLocked()
 	a.mu.Unlock()
 
 	// Nothing to flush
-	if bufSize == 0 {
+	if s.size == 0 {
 		return nil
 	}
+
+	if err := a.writeSnapshot(ctx, s); err != nil {
+		a.restore(s)
+		a.flushFailed = true
+		return err
+	}
+	a.flushFailed = false
+	return nil
+}
+
+// writeSnapshot writes a snapshot to SQLite in a single transaction, so a
+// failure rolls back completely.
+func (a *Aggregator) writeSnapshot(ctx context.Context, s *snapshot) error {
+	requests, visitors, referrers := s.requests, s.visitors, s.referrers
+	userAgents, countries, browsers := s.userAgents, s.countries, s.browsers
+	osStats, durationHist, bufSize := s.osStats, s.durationHist, s.size
 
 	// Begin transaction
 	tx, err := a.db.BeginTx(ctx, nil)
