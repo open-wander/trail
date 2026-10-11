@@ -106,30 +106,9 @@ func main() {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
-	// Start goroutines for background services
-	// The tailer gets its own context so it can be stopped before the
-	// aggregator: once no sender exists, the aggregator's drain is complete.
-	tailCtx, tailCancel := context.WithCancel(ctx)
-	defer tailCancel()
-	tailDone := make(chan struct{})
-	go func() {
-		defer close(tailDone)
-		if err := tail.Run(tailCtx, lines); err != nil {
-			if err != context.Canceled {
-				slog.Error("tailer.failed", "error", err)
-			}
-		}
-	}()
-
-	aggDone := make(chan struct{})
-	go func() {
-		defer close(aggDone)
-		if err := agg.Run(ctx, lines); err != nil {
-			if err != context.Canceled {
-				slog.Error("aggregator.failed", "error", err)
-			}
-		}
-	}()
+	// Start the tailer and aggregator. The tailer is stopped before the
+	// aggregator so no sender exists when the aggregator drains the channel.
+	pl := startPipeline(ctx, tail, agg, lines)
 
 	go func() {
 		if err := cleaner.Run(ctx); err != nil {
@@ -157,28 +136,16 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Stop the tailer first so its final position save happens before the
-	// aggregator drains the channel and before the database is closed.
-	tailCancel()
-	select {
-	case <-tailDone:
-	case <-time.After(3 * time.Second):
-		slog.Error("tailer.stop_timeout")
-	}
+	// Stop the tailer, then the aggregator, and wait for its final flush
+	// so the deferred database Close comes last.
+	pl.stop(3*time.Second, 10*time.Second)
 
-	// Stop the aggregator and retention cleaner
+	// Stop the retention cleaner
 	cancel()
 
 	// Shutdown server with timeout
 	if err := srv.Shutdown(); err != nil {
 		slog.Error("server.shutdown_failed", "error", err)
-	}
-
-	// Wait for the aggregator final flush before the database is closed
-	select {
-	case <-aggDone:
-	case <-time.After(10 * time.Second):
-		slog.Error("aggregator.flush_timeout")
 	}
 
 	// Give goroutines a moment to finish cleanup

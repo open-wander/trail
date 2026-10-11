@@ -136,3 +136,17 @@ Comments: no task/phase identifiers, norman scaffolding or directive comments in
 - Advisor review: PASS (non-blocking: values beyond log_level/geoip unchecked - orchestrator added TestStartupAttrsValues comparing the full slice).
 - Orchestrator overlay mutations, all red: Init to stderr, password in attrs, db_path wired to LogFile, each of three routine lines at INFO, banner on.
 - v0.5.0 released (run 38156722050): tests green on Linux amd64/arm64, image built on the self-hosted runner, GitHub release created.
+
+## 2026-10-11 - Task 4.5: shutdown wiring under test
+
+- Changes: new `cmd/trail/shutdown.go` (`lineProducer`/`lineConsumer`, `startPipeline`, `pipeline.stop`) and `shutdown_test.go`; `main.go` uses them. tailer.go and aggregator.go unchanged.
+- Advisor plan: REVISE. The brief's premise was wrong: the normal path was already lossless (all sends happen before tailDone closes, and the aggregator was only cancelled after it). The only loss window is the tailer.stop_timeout path, which no bounded wait can close; documented on `stop` and exercised (no panic) by TestPipelineTailerTimeout. Chosen design: the sole sender's goroutine closes the channel; the aggregator gets its own context and exits through its channel-close path.
+- Advisor review: MINOR (doubled aggCancel on the aggregator-timeout path - orchestrator removed the in-branch call; late-send test proves no panic but does not pin that the line is unprocessed; behaviour notes below).
+- Behaviour changes: `srv.Shutdown` runs after the aggregator wait (still before db.Close); if the tailer fails early, the aggregator now flushes and exits instead of idling.
+- Orchestrator verification: TestPipeline* -race -count=20 green, full suite green; overlay mutations red: aggregator cancelled first, channel not closed, aggregator not awaited, tailer.stop_timeout log removed, no aggregator cancel on tailer timeout. SIGTERM smoke with 50 buffered lines: exit 0, log order tailer.stopped -> aggregator.flushed(50) -> server.shutting_down -> trail.shutdown_complete, 50 rows in the DB.
+- PATTERN: [concurrency] - Let the sole sender close the channel (defer close in its own goroutine) rather than a coordinator: the close can never race a send.
+- PATTERN: [process] - Briefs can state a loss that does not exist; the advisor's job is to check the happens-before chain before any code is written.
+
+## 2026-10-11 - Phase 4 collapsed
+
+All five Phase 4 tasks DONE; table moved to TASKS-archive.md. Every phase in TASKS.md is complete. v0.5.0 (tagged at ce224b1) contains 4.1; 4.2-4.5 are on main after it.
