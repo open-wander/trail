@@ -53,3 +53,14 @@ Append-only execution log. Newest entries at the bottom.
 ## 2026-10-11 - Phase 1 collapsed
 
 All six Phase 1 tasks DONE; table moved to TASKS-archive.md.
+
+## 2026-10-11 - Sweep after Phase 1
+
+Invariants (overlay mutations, working tree never touched): swept 14: 11 guarded, 2 confirmed unguarded, 1 refuted.
+- Guarded: combined format never parses JSON (TestParserCombinedRejectsJSON); traefik formats dispatch JSON (TestParserMixedFormats, backfill TestRun_MixedCLFAndJSON); JSON core-field validation, "-" router -> "" and ms duration (TestParseTraefikJSON, TestTraefikJSONMatchesCLF); detection JSON majority and Traefik family vs combined (TestDetectFormat); leading-whitespace JSON (TestIsJSONLine); empty router -> "unrouted" (TestUnroutedTrafficExcluded); SetLogFormat honoured (TestSecurityThreatPatternMode). 1.5/1.6 drain, fresh-context flush and sentOffset mutations were guarded during their tasks.
+- CONFIRMED UNGUARDED (high): tailer skip-and-advance regression. Re-adding `case <-time.After(50ms): sentOffset = readOffset` beside the ctx case passes tailer and smoke tests (-count=3). Cost: silent loss of log lines whenever the aggregator is slow, the exact bug 1.6 removed. Test: hold the channel full past a short skip interval before cancelling and assert the saved offset.
+- CONFIRMED UNGUARDED (medium): post-cancel flush guards in aggregator Run (`ctx.Err() == nil` on the threshold flush, `ctx.Err() != nil -> continue` on the ticker). Removing either passes aggregator and smoke tests. Cost: flush() resets the buffers before BeginTx, so a flush on a cancelled ctx drops up to 1,000 entries / one interval and Run returns before draining. Narrow window at shutdown. Test needs a deterministic hook (e.g. an injectable flush or ticker channel).
+- REFUTED: empty-line sentOffset advance in the tailer. Unguarded, but the only cost is re-reading blank lines on the next tick; no data effect.
+- Observation: flush() resetting buffers before the transaction means any DB error during a normal flush also drops that batch. Wider than Phase 1; not a sweep finding.
+
+Comments: no task/phase/requirement identifiers or norman scaffolding in the Phase 1 files; no directive comments in scope. ParseLine doc (7 lines) and TestSecurityThreatPatternMode doc (8 lines) left as is: each line is a distinct claim. No edits.
