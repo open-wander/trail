@@ -20,3 +20,13 @@ Append-only execution log. Newest entries at the bottom.
 - PATTERN: [shutdown] - Final flushes after cancellation need a fresh bounded context (`context.Background` + timeout), and main must wait on the flushing goroutine before the deferred `db.Close`.
 - PATTERN: [testing] - When a select has two ready cases, a test aimed at one branch is a coin flip. Repeat the scenario (cheap with in-memory SQLite) and mutation-test each branch separately with -count=N.
 - PATTERN: [deploy] - An in-process shutdown wait only helps if the orchestrator's kill_timeout is longer; check the job spec alongside the code.
+
+## 2026-10-11 - Task 1.3: handler test for the security view's format check
+
+- Changes: new `internal/server/security_handler_test.go` (`TestSecurityThreatPatternMode`). Test-only.
+- Verification: orchestrator mutations on handlers.go: `!=` red on all 4 subtests, `|| true` red on both Traefik, `&& false` red on both combined. Advisor review: PASS.
+- Workflow note: the isolated worktrees were created from `origin/main`, not local HEAD, so workers did not see the unpushed 2.2/1.5 commits. The test needed adapting to `New` returning `(*Server, error)`.
+- PATTERN: [testing] - ThreatPatterns unrouted mode matches only the literal router `unrouted` (the aggregator rewrites an empty router to it); seed that value.
+- PATTERN: [testing] - Slice security-page assertions to the threat card ("Threat Pattern Classification" up to "Bot vs Human Traffic"): ErrorPaths lists the same paths in every mode.
+- PATTERN: [testing] - Mutate a boolean expression with `|| true` / `&& false` rather than a literal, so imports stay used and the build does not fail.
+- PATTERN: [norman] - Push (or base worktrees on local HEAD) before an isolated batch; otherwise workers re-implement or contradict unpushed commits.
