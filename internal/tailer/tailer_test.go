@@ -398,27 +398,102 @@ func TestProcessTick_CancelDoesNotAdvancePastUnsentLines(t *testing.T) {
 	}
 
 	// "aaa\n" + "\n" + "bbb\n" = 9 bytes
-	offset, inode, size, err := loadPosition(database, logPath)
-	if err != nil {
+	if offset, _, _, err := loadPosition(database, logPath); err != nil {
 		t.Fatal(err)
-	}
-	if offset != 9 {
+	} else if offset != 9 {
 		t.Fatalf("saved offset = %d, want 9", offset)
 	}
 
 	// Resume: the unsent lines must be re-read.
+	assertResumed(t, tl, database, logPath, []string{"ccc", "ddd", "eee"})
+}
+
+// A full channel must stall processTick until ctx is cancelled. A skip-after-
+// timeout regression would return early and advance past lines never delivered.
+func TestProcessTick_BlockedChannelNeverSkips(t *testing.T) {
+	database := setupTestDB(t)
+	defer database.Close()
+
+	logPath := filepath.Join(t.TempDir(), "test.log")
+	if err := os.WriteFile(logPath, []byte("aaa\nbbb\nccc\nddd\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	tl := New(logPath, database)
+	blocked := make(chan string, 1) // nobody reads
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() { done <- tl.processTick(ctx, blocked, 0, 0, 0) }()
+
+	deadline := time.Now().Add(5 * time.Second)
+	for len(blocked) < cap(blocked) {
+		if time.Now().After(deadline) {
+			t.Fatal("channel never filled")
+		}
+		time.Sleep(time.Millisecond)
+	}
+
+	// Hold well past any plausible skip interval; the tick must stay blocked.
+	select {
+	case err := <-done:
+		t.Fatalf("processTick returned while channel blocked (err=%v): lines were skipped", err)
+	case <-time.After(250 * time.Millisecond):
+	}
+	if offset, _, _, err := loadPosition(database, logPath); err != nil {
+		t.Fatal(err)
+	} else if offset != 0 {
+		t.Fatalf("position saved while blocked: offset = %d, want 0", offset)
+	}
+
+	cancel()
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Error("expected ctx error from processTick")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("processTick did not return after cancel")
+	}
+
+	var got []string
+	for len(blocked) > 0 {
+		got = append(got, <-blocked)
+	}
+	if len(got) != 1 || got[0] != "aaa" {
+		t.Fatalf("received %v, want [aaa]", got)
+	}
+
+	// Offset must be the end of the last line actually received.
+	wantOffset := int64(len(got[0]) + 1)
+	if offset, _, _, err := loadPosition(database, logPath); err != nil {
+		t.Fatal(err)
+	} else if offset != wantOffset {
+		t.Fatalf("saved offset = %d, want %d", offset, wantOffset)
+	}
+
+	assertResumed(t, tl, database, logPath, []string{"bbb", "ccc", "ddd"})
+}
+
+// assertResumed runs one more tick from the saved position and checks it
+// delivers exactly want.
+func assertResumed(t *testing.T, tl *Tailer, database *sql.DB, logPath string, want []string) {
+	t.Helper()
+	offset, inode, size, err := loadPosition(database, logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
 	out := make(chan string, 10)
 	if err := tl.processTick(context.Background(), out, offset, inode, size); err != nil {
-		t.Fatalf("second processTick: %v", err)
+		t.Fatalf("resumed processTick: %v", err)
 	}
 	close(out)
 	var got []string
 	for l := range out {
 		got = append(got, l)
 	}
-	want := []string{"ccc", "ddd", "eee"}
 	if len(got) != len(want) {
-		t.Fatalf("got %v, want %v", got, want)
+		t.Fatalf("resumed %v, want %v", got, want)
 	}
 	for i := range want {
 		if got[i] != want[i] {
