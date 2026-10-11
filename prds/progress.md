@@ -109,3 +109,14 @@ All three Phase 3 tasks DONE; table moved to TASKS-archive.md. No separate sweep
 ## 2026-10-11 - Phase 2 collapsed
 
 All three Phase 2 tasks DONE; table moved to TASKS-archive.md. All phases in TASKS.md are now complete.
+
+## 2026-10-11 - Sweep after Phase 2
+
+Invariants (overlay mutations, tree never touched): swept 8: 4 guarded, 3 confirmed unguarded, 1 refuted (wrong direction) that exposed a bug.
+- Guarded: bcrypt mismatch rejected (TestVerifyPassword); non-bcrypt htpasswd lines rejected (TestNewHtpasswdStartup, TestParseHtpasswd*); JSON handler not text (TestNewEmitsJSONAndFiltersByLevel); /static skip does not swallow /staticfoo (TestRequestLoggerStatus). 2.1/2.3 log and request-logging mutations were guarded during their tasks.
+- CONFIRMED UNGUARDED (high): htpasswd Authorizer accepting any credentials. `return verifyPassword(pass, hashedPass) || true` passes every test: TestNewHtpasswdStartup only sends no credentials (401) and correct ones; no test sends a wrong password or unknown user against an htpasswd file. Cost: full auth bypass undetected. Test: valid htpasswd + wrong password and unknown user -> 401.
+- CONFIRMED UNGUARDED (medium): no secrets in the startup summary. Adding `"auth_pass", cfg.AuthPass` to `trail.starting` in main passes every test (main has no tests). Cost: basic-auth password shipped to Loki. Test needs the startup attrs built by a testable function.
+- CONFIRMED UNGUARDED (low): logs on stdout. `logging.Init` writing to os.Stderr passes; Nomad/Docker collect both streams, so the cost is only a standard violation.
+- BUG (not a coverage gap): env-credential auth fails open. `TRAIL_AUTH_USER` set with `TRAIL_AUTH_PASS` empty or unset (or the reverse) is treated as "no auth configured": the dashboard is served without auth and only `auth=none` is logged at INFO. Same class as 2.2. Fix: one of the pair set without the other is a startup error.
+
+Comments: no task/phase identifiers, norman scaffolding or directive comments in the Phase 2 files; no edits.
