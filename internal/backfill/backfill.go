@@ -6,7 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -46,7 +46,7 @@ func Run(ctx context.Context, db *sql.DB, logPath string, p *parser.Parser) erro
 		return nil
 	}
 
-	log.Printf("backfill: %d rotated file(s) to import", len(pending))
+	slog.Info("backfill.pending", "files", len(pending))
 
 	// Create dedicated aggregator + channel for backfill
 	lines := make(chan string, 10000)
@@ -66,7 +66,7 @@ func Run(ctx context.Context, db *sql.DB, logPath string, p *parser.Parser) erro
 			return err
 		}
 
-		log.Printf("backfill: importing %s", f.path)
+		slog.Debug("backfill.file_importing", "path", f.path)
 		if err := processFile(ctx, f, lines); err != nil {
 			close(lines)
 			<-aggDone
@@ -96,7 +96,7 @@ func Run(ctx context.Context, db *sql.DB, logPath string, p *parser.Parser) erro
 		return fmt.Errorf("aggregator flush: %w", err)
 	}
 
-	log.Printf("backfill: complete")
+	slog.Info("backfill.done")
 	return nil
 }
 
@@ -234,6 +234,6 @@ func processFile(ctx context.Context, f rotatedFile, lines chan<- string) error 
 		return fmt.Errorf("scanner error: %w", err)
 	}
 
-	log.Printf("backfill: read %d lines from %s", count, f.path)
+	slog.Info("backfill.file_imported", "path", f.path, "lines", count)
 	return nil
 }

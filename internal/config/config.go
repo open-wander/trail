@@ -13,6 +13,7 @@ type Config struct {
 	Listen        string // HTTP listen address
 	RetentionDays int    // Days to retain analytics data
 	LogFormat     string // Log format: "auto", "traefik", "traefik-json", or "combined"
+	LogLevel      string // Level of Trail's own logs: "debug", "info", "warn" or "error"
 
 	// Authentication settings (all optional)
 	HtpasswdFile string // Path to htpasswd file for authentication
@@ -30,6 +31,7 @@ func Load() (*Config, error) {
 		DBPath:       getEnvOrDefault("TRAIL_DB_PATH", "/data/trail.db"),
 		Listen:       getEnvOrDefault("TRAIL_LISTEN", ":8080"),
 		LogFormat:    getEnvOrDefault("TRAIL_LOG_FORMAT", "auto"),
+		LogLevel:     getEnvOrDefault("TRAIL_LOG_LEVEL", "info"),
 		HtpasswdFile: os.Getenv("TRAIL_HTPASSWD_FILE"),
 		AuthUser:     os.Getenv("TRAIL_AUTH_USER"),
 		AuthPass:     os.Getenv("TRAIL_AUTH_PASS"),

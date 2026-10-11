@@ -3,7 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
@@ -16,6 +16,7 @@ import (
 	"github.com/open-wander/trail/internal/backfill"
 	"github.com/open-wander/trail/internal/config"
 	"github.com/open-wander/trail/internal/db"
+	"github.com/open-wander/trail/internal/logging"
 	"github.com/open-wander/trail/internal/parser"
 	"github.com/open-wander/trail/internal/retention"
 	"github.com/open-wander/trail/internal/server"
@@ -23,10 +24,15 @@ import (
 )
 
 func main() {
+	// Logging comes first, straight from the environment, so a configuration
+	// error is already emitted as JSON at the requested level.
+	logging.Init(os.Getenv("TRAIL_LOG_LEVEL"))
+
 	// Load configuration
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
+		slog.Error("config.load_failed", "error", err)
+		os.Exit(1)
 	}
 
 	// Crash reporting to GlitchTip (Sentry protocol) when SENTRY_DSN is set.
@@ -41,9 +47,9 @@ func main() {
 			Release:          os.Getenv("SENTRY_RELEASE"),
 			AttachStacktrace: true,
 		}); err != nil {
-			log.Printf("sentry init: %v", err)
+			slog.Warn("sentry.init_failed", "error", err)
 		} else {
-			log.Printf("crash reporting enabled (environment=%s)", env)
+			slog.Info("sentry.enabled", "environment", env)
 			defer sentry.Flush(2 * time.Second)
 		}
 	}
@@ -51,7 +57,8 @@ func main() {
 	// Open database
 	database, err := db.Open(cfg.DBPath)
 	if err != nil {
-		log.Fatalf("Failed to open database: %v", err)
+		slog.Error("db.open_failed", "path", cfg.DBPath, "error", err)
+		os.Exit(1)
 	}
 	defer database.Close()
 
@@ -59,7 +66,8 @@ func main() {
 	// fails startup immediately instead of after a long backfill.
 	srv, err := server.New(cfg, database, trail.TemplatesFS, trail.StaticFS)
 	if err != nil {
-		log.Fatalf("Failed to configure server: %v", err)
+		slog.Error("server.config_failed", "error", err)
+		os.Exit(1)
 	}
 
 	// Create parser with configured format
@@ -69,11 +77,8 @@ func main() {
 	if p.Format() == parser.FormatAuto {
 		if lines, err := readFirstLines(cfg.LogFile, 10); err == nil && len(lines) > 0 {
 			detected := p.Detect(lines)
-			if detected == parser.FormatCombined {
-				log.Printf("Auto-detected log format: %s", detected)
-			} else {
-				log.Printf("Auto-detected log format: %s (Traefik CLF and JSON lines both accepted)", detected)
-			}
+			// Anything other than combined is Traefik, which accepts both CLF and JSON lines.
+			slog.Info("format.detected", "format", detected.String(), "mixed", detected != parser.FormatCombined)
 		}
 	}
 
@@ -82,7 +87,7 @@ func main() {
 
 	// Import rotated log files before starting live tail
 	if err := backfill.Run(context.Background(), database, cfg.LogFile, p); err != nil {
-		log.Printf("Backfill failed: %v", err)
+		slog.Error("backfill.failed", "error", err)
 	}
 
 	// Create shared lines channel (buffered, capacity 10000)
@@ -111,7 +116,7 @@ func main() {
 		defer close(tailDone)
 		if err := tail.Run(tailCtx, lines); err != nil {
 			if err != context.Canceled {
-				log.Printf("Tailer error: %v", err)
+				slog.Error("tailer.failed", "error", err)
 			}
 		}
 	}()
@@ -121,7 +126,7 @@ func main() {
 		defer close(aggDone)
 		if err := agg.Run(ctx, lines); err != nil {
 			if err != context.Canceled {
-				log.Printf("Aggregator error: %v", err)
+				slog.Error("aggregator.failed", "error", err)
 			}
 		}
 	}()
@@ -129,7 +134,7 @@ func main() {
 	go func() {
 		if err := cleaner.Run(ctx); err != nil {
 			if err != context.Canceled {
-				log.Printf("Retention cleaner error: %v", err)
+				slog.Error("retention.failed", "error", err)
 			}
 		}
 	}()
@@ -137,7 +142,11 @@ func main() {
 	// Start server in goroutine (since it blocks)
 	serverErrors := make(chan error, 1)
 	go func() {
-		log.Printf("Trail starting - listening on %s, watching %s", cfg.Listen, cfg.LogFile)
+		slog.Info("trail.starting",
+			"listen", cfg.Listen, "log_file", cfg.LogFile, "db_path", cfg.DBPath,
+			"log_format", cfg.LogFormat, "log_level", logging.ParseLevel(cfg.LogLevel).String(),
+			"retention_days", cfg.RetentionDays, "geoip", cfg.GeoIPPath != "",
+			"auth", authMode(cfg))
 		if err := srv.Start(); err != nil {
 			serverErrors <- err
 		}
@@ -146,9 +155,10 @@ func main() {
 	// Wait for shutdown signal or server error
 	select {
 	case <-sigCh:
-		log.Println("Shutting down...")
+		slog.Info("trail.shutting_down")
 	case err := <-serverErrors:
-		log.Fatalf("Server failed to start: %v", err)
+		slog.Error("server.start_failed", "listen", cfg.Listen, "error", err)
+		os.Exit(1)
 	}
 
 	// Stop the tailer first so its final position save happens before the
@@ -157,7 +167,7 @@ func main() {
 	select {
 	case <-tailDone:
 	case <-time.After(3 * time.Second):
-		log.Println("Tailer did not stop in time")
+		slog.Error("tailer.stop_timeout")
 	}
 
 	// Stop the aggregator and retention cleaner
@@ -165,20 +175,33 @@ func main() {
 
 	// Shutdown server with timeout
 	if err := srv.Shutdown(); err != nil {
-		log.Printf("Server shutdown error: %v", err)
+		slog.Error("server.shutdown_failed", "error", err)
 	}
 
 	// Wait for the aggregator final flush before the database is closed
 	select {
 	case <-aggDone:
 	case <-time.After(10 * time.Second):
-		log.Printf("aggregator did not finish flushing before timeout")
+		slog.Error("aggregator.flush_timeout")
 	}
 
 	// Give goroutines a moment to finish cleanup
 	time.Sleep(100 * time.Millisecond)
 
-	log.Println("Shutdown complete")
+	slog.Info("trail.shutdown_complete")
+}
+
+// authMode names the configured authentication method for the startup
+// summary. It never exposes credentials.
+func authMode(cfg *config.Config) string {
+	switch {
+	case cfg.HtpasswdFile != "":
+		return "htpasswd"
+	case cfg.AuthUser != "" && cfg.AuthPass != "":
+		return "basic"
+	default:
+		return "none"
+	}
 }
 
 // readFirstLines reads up to n non-empty lines from a file.

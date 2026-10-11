@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"io/fs"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"strings"
@@ -45,7 +45,7 @@ func (s *Server) SetLogFormat(f parser.Format) { s.logFormat = f }
 func New(cfg *config.Config, database *sql.DB, templatesFS, staticFS fs.FS) (*Server, error) {
 	app := fiber.New(fiber.Config{
 		AppName:               "Trail Analytics",
-		DisableStartupMessage: false,
+		DisableStartupMessage: true,
 	})
 
 	// Crash reporting (GlitchTip) when SENTRY_DSN is set - outermost, so it
@@ -60,7 +60,7 @@ func New(cfg *config.Config, database *sql.DB, templatesFS, staticFS fs.FS) (*Se
 	// Sub into templates/ directory so patterns are just filenames
 	tmplFS, err := fs.Sub(templatesFS, "templates")
 	if err != nil {
-		log.Fatalf("Failed to open embedded templates: %v", err)
+		return nil, fmt.Errorf("open embedded templates: %w", err)
 	}
 
 	// Load and parse templates with helper functions
@@ -109,7 +109,7 @@ func New(cfg *config.Config, database *sql.DB, templatesFS, staticFS fs.FS) (*Se
 	// Sub into static/ directory for file serving
 	staticSub, err := fs.Sub(staticFS, "static")
 	if err != nil {
-		log.Fatalf("Failed to open embedded static files: %v", err)
+		return nil, fmt.Errorf("open embedded static files: %w", err)
 	}
 
 	s := &Server{
@@ -211,7 +211,7 @@ func parseHtpasswd(filepath string) (map[string]string, error) {
 		// Parse line format: username:hash
 		parts := strings.SplitN(line, ":", 2)
 		if len(parts) != 2 {
-			log.Printf("Warning: Invalid htpasswd entry on line %d: missing colon", lineNum)
+			slog.Warn("server.htpasswd_invalid_line", "line", lineNum)
 			continue
 		}
 
@@ -221,9 +221,9 @@ func parseHtpasswd(filepath string) (map[string]string, error) {
 		// Validate hash format (we only support bcrypt)
 		if !strings.HasPrefix(hash, "$2") {
 			if strings.HasPrefix(hash, "$apr1$") {
-				log.Printf("Warning: APR1 MD5 hash for user '%s' is not supported (line %d). Please use bcrypt.", username, lineNum)
+				slog.Warn("server.htpasswd_unsupported_hash", "user", username, "line", lineNum, "scheme", "apr1")
 			} else {
-				log.Printf("Warning: Unsupported hash format for user '%s' on line %d. Only bcrypt is supported.", username, lineNum)
+				slog.Warn("server.htpasswd_unsupported_hash", "user", username, "line", lineNum, "scheme", "other")
 			}
 			continue
 		}
@@ -279,13 +279,12 @@ func (s *Server) setupRoutes() {
 
 // Start begins listening for HTTP requests
 func (s *Server) Start() error {
-	log.Printf("Starting server on %s", s.config.Listen)
 	return s.app.Listen(s.config.Listen)
 }
 
 // Shutdown gracefully shuts down the server
 func (s *Server) Shutdown() error {
-	log.Println("Shutting down server...")
+	slog.Info("server.shutting_down")
 	return s.app.Shutdown()
 }
 

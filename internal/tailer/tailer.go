@@ -5,7 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"syscall"
 	"time"
@@ -36,7 +36,7 @@ func (t *Tailer) Run(ctx context.Context, lines chan<- string) error {
 	ticker := time.NewTicker(t.interval)
 	defer ticker.Stop()
 
-	log.Printf("tailer: starting for %s", t.path)
+	slog.Info("tailer.starting", "path", t.path)
 
 	// Load saved position from database
 	savedOffset, savedInode, savedSize, err := loadPosition(t.db, t.path)
@@ -44,21 +44,21 @@ func (t *Tailer) Run(ctx context.Context, lines chan<- string) error {
 		return fmt.Errorf("failed to load position: %w", err)
 	}
 
-	log.Printf("tailer: loaded position offset=%d inode=%d size=%d", savedOffset, savedInode, savedSize)
+	slog.Info("tailer.position_loaded", "offset", savedOffset, "inode", savedInode, "size", savedSize)
 
 	for {
 		select {
 		case <-ctx.Done():
-			log.Printf("tailer: stopping (context cancelled)")
+			slog.Info("tailer.stopped")
 			return ctx.Err()
 		case <-ticker.C:
 			if err := t.processTick(ctx, lines, savedOffset, savedInode, savedSize); err != nil {
 				if ctx.Err() != nil {
-					log.Printf("tailer: stopping (context cancelled)")
+					slog.Info("tailer.stopped")
 					return ctx.Err()
 				}
 				// Non-fatal errors (file not found, etc.) - just log and retry
-				log.Printf("tailer: tick error: %v", err)
+				slog.Warn("tailer.tick_failed", "error", err)
 				continue
 			}
 
@@ -94,12 +94,12 @@ func (t *Tailer) processTick(ctx context.Context, lines chan<- string, savedOffs
 	switch {
 	case currentInode != savedInode:
 		// Rotation detected: new file with different inode
-		log.Printf("tailer: rotation detected (inode %d -> %d), starting from beginning", savedInode, currentInode)
+		slog.Info("tailer.rotation_detected", "old_inode", savedInode, "new_inode", currentInode)
 		startOffset = 0
 
 	case currentSize < savedOffset:
 		// Copytruncate detected: file was truncated in place
-		log.Printf("tailer: copytruncate detected (size %d < offset %d), starting from beginning", currentSize, savedOffset)
+		slog.Info("tailer.truncation_detected", "size", currentSize, "offset", savedOffset)
 		startOffset = 0
 
 	default:
@@ -160,7 +160,7 @@ scan:
 
 	// Save the offset of the last line actually sent
 	if sentOffset > startOffset {
-		log.Printf("tailer: processed %d lines, new offset=%d", lineCount, sentOffset)
+		slog.Debug("tailer.processed", "lines", lineCount, "offset", sentOffset)
 		if err := savePosition(t.db, t.path, sentOffset, currentInode, currentSize); err != nil {
 			return fmt.Errorf("failed to save position: %w", err)
 		}

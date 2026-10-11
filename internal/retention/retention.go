@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 )
 
@@ -28,7 +28,7 @@ func New(db *sql.DB, retentionDays int) *Cleaner {
 func (c *Cleaner) Run(ctx context.Context) error {
 	// Run immediately on start
 	if err := c.cleanup(); err != nil {
-		log.Printf("retention: initial cleanup failed: %v", err)
+		slog.Error("retention.cleanup_failed", "initial", true, "error", err)
 	}
 
 	ticker := time.NewTicker(c.interval)
@@ -40,7 +40,7 @@ func (c *Cleaner) Run(ctx context.Context) error {
 			return ctx.Err()
 		case <-ticker.C:
 			if err := c.cleanup(); err != nil {
-				log.Printf("retention: cleanup failed: %v", err)
+				slog.Error("retention.cleanup_failed", "initial", false, "error", err)
 			}
 		}
 	}
@@ -119,8 +119,15 @@ func (c *Cleaner) cleanup() error {
 	// Parse cutoff for friendly logging
 	cutoffDate := cutoff[:10] // Extract YYYY-MM-DD from RFC3339
 
-	log.Printf("retention: deleted %d requests, %d visitors, %d referrers, %d user_agents, %d countries, %d browsers, %d os_stats, %d duration_hist older than %s",
-		reqCount, visCount, refCount, uaCount, countryCount, browserCount, osCount, dhCount, cutoffDate)
+	total := reqCount + visCount + refCount + uaCount + countryCount + browserCount + osCount + dhCount
+	if total == 0 {
+		slog.Debug("retention.nothing_deleted", "older_than", cutoffDate)
+		return nil
+	}
+	slog.Info("retention.deleted",
+		"requests", reqCount, "visitors", visCount, "referrers", refCount,
+		"user_agents", uaCount, "countries", countryCount, "browsers", browserCount,
+		"os_stats", osCount, "duration_hist", dhCount, "older_than", cutoffDate)
 
 	return nil
 }

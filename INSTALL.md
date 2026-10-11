@@ -55,6 +55,7 @@ export TRAIL_LISTEN=:8080                             # Port to listen on
 # Optional - Retention and format
 export TRAIL_RETENTION_DAYS=90                        # Auto-delete older data
 export TRAIL_LOG_FORMAT=auto                          # auto, traefik, traefik-json, or combined
+export TRAIL_LOG_LEVEL=info                           # Trail's own logs (JSON on stdout): debug, info, warn, error
 
 # Optional - Authentication (choose one)
 # Option A: htpasswd file (recommended)
@@ -77,6 +78,7 @@ export TRAIL_GEOIP_PATH=/usr/share/geoip/dbip-country-lite.mmdb
 | `TRAIL_LISTEN` | `:8080` | HTTP listen address (e.g., `:8080` or `127.0.0.1:8080`) |
 | `TRAIL_RETENTION_DAYS` | `90` | Delete analytics data older than N days |
 | `TRAIL_LOG_FORMAT` | `auto` | Log format: `auto`, `traefik`, `traefik-json`, or `combined` |
+| `TRAIL_LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error`. Trail's own logs are JSON on stdout. Unknown values fall back to `info`. Unrelated to `TRAIL_LOG_FORMAT`, which only selects how the input access log is parsed |
 | `TRAIL_HTPASSWD_FILE` | | Path to htpasswd file (bcrypt hashes only) |
 | `TRAIL_AUTH_USER` | | Basic auth username (plaintext) |
 | `TRAIL_AUTH_PASS` | | Basic auth password (plaintext) |
@@ -161,6 +163,7 @@ Environment="TRAIL_DB_PATH=/var/lib/trail/trail.db"
 Environment="TRAIL_LISTEN=:8080"
 Environment="TRAIL_RETENTION_DAYS=90"
 Environment="TRAIL_LOG_FORMAT=auto"
+Environment="TRAIL_LOG_LEVEL=info"
 Environment="TRAIL_HTPASSWD_FILE=/etc/trail/htpasswd"
 
 ExecStart=/usr/local/bin/trail

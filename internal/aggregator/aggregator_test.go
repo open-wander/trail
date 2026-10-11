@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
-	"log"
-	"os"
+	"log/slog"
 	"strings"
 	"testing"
 	"time"
@@ -726,7 +726,7 @@ func TestOnLineThresholdAfterCancelKeepsEntries(t *testing.T) {
 	if err := a.onLine(ctx, clfCurlLine); err != nil {
 		t.Fatalf("onLine returned %v, want nil", err)
 	}
-	if strings.Contains(logs.String(), "error during") {
+	if got := countMsg(logRecords(t, logs), "aggregator.flush_failed"); got != 0 {
 		t.Errorf("flush attempted after cancel: %s", logs.String())
 	}
 	if got := bufferedSize(a); got != bufferSizeThreshold {
@@ -752,7 +752,7 @@ func TestOnTickAfterCancelKeepsEntries(t *testing.T) {
 	if err := a.onTick(ctx); err != nil {
 		t.Fatalf("onTick returned %v, want nil", err)
 	}
-	if strings.Contains(logs.String(), "error during") {
+	if got := countMsg(logRecords(t, logs), "aggregator.flush_failed"); got != 0 {
 		t.Errorf("flush attempted after cancel: %s", logs.String())
 	}
 	if got := bufferedSize(a); got != n {
@@ -799,14 +799,73 @@ func TestRunFlushesOnChannelCloseWithCancelledContext(t *testing.T) {
 	}
 }
 
-// captureLog redirects the standard logger into a buffer for the test. Read
-// it only once the code under test has stopped writing.
+// captureLog points slog.Default at a JSON handler writing to a buffer, at
+// DEBUG so routine records are captured too and an absence assertion cannot
+// pass merely because the level filtered the record. Read it only once the
+// code under test has stopped writing.
 func captureLog(t *testing.T) *bytes.Buffer {
 	t.Helper()
 	var buf bytes.Buffer
-	log.SetOutput(&buf)
-	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+	orig := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { slog.SetDefault(orig) })
 	return &buf
+}
+
+// logRecords decodes the captured JSON log lines.
+func logRecords(t *testing.T, buf *bytes.Buffer) []map[string]any {
+	t.Helper()
+	var recs []map[string]any
+	for _, line := range strings.Split(strings.TrimSpace(buf.String()), "\n") {
+		if line == "" {
+			continue
+		}
+		var m map[string]any
+		if err := json.Unmarshal([]byte(line), &m); err != nil {
+			t.Fatalf("log line is not JSON: %q: %v", line, err)
+		}
+		recs = append(recs, m)
+	}
+	return recs
+}
+
+// countMsg counts records whose msg is key.
+func countMsg(recs []map[string]any, key string) int {
+	n := 0
+	for _, r := range recs {
+		if r["msg"] == key {
+			n++
+		}
+	}
+	return n
+}
+
+// assertDropped checks the aggregator.buffer_dropped records: none when want
+// is 0, otherwise exactly one reporting want dropped entries.
+func assertDropped(t *testing.T, buf *bytes.Buffer, want int) {
+	t.Helper()
+	recs := logRecords(t, buf)
+	got := countMsg(recs, "aggregator.buffer_dropped")
+	if want == 0 {
+		if got != 0 {
+			t.Errorf("unexpected aggregator.buffer_dropped: %s", buf.String())
+		}
+		return
+	}
+	if got != 1 {
+		t.Fatalf("aggregator.buffer_dropped records = %d, want 1: %s", got, buf.String())
+	}
+	for _, r := range recs {
+		if r["msg"] != "aggregator.buffer_dropped" {
+			continue
+		}
+		if r["dropped"] != float64(want) {
+			t.Errorf("dropped = %v, want %d", r["dropped"], want)
+		}
+		if r["level"] != "ERROR" {
+			t.Errorf("aggregator.buffer_dropped level = %v, want ERROR", r["level"])
+		}
+	}
 }
 
 // chromeLine returns a CLF line from a human browser at ip requesting path.
@@ -978,13 +1037,22 @@ func TestRunSurvivesThresholdFlushFailure(t *testing.T) {
 func TestOnTickFailureKeepsRunningAndRetries(t *testing.T) {
 	db := testDB(t)
 	a := New(db, nil, "")
-	captureLog(t)
+	logs := captureLog(t)
 	for range 3 {
 		a.handleLine(clfCurlLine)
 	}
 	breakRequests(t, db)
 	if err := a.onTick(context.Background()); err != nil {
 		t.Fatalf("onTick returned %v, want nil", err)
+	}
+	var failed []map[string]any
+	for _, r := range logRecords(t, logs) {
+		if r["msg"] == "aggregator.flush_failed" {
+			failed = append(failed, r)
+		}
+	}
+	if len(failed) != 1 || failed[0]["trigger"] != "tick" || failed[0]["level"] != "ERROR" {
+		t.Errorf("want one ERROR aggregator.flush_failed with trigger=tick, got %v", failed)
 	}
 	if got := bufferedSize(a); got != 3 {
 		t.Errorf("bufferSize = %d, want 3", got)
@@ -1010,7 +1078,7 @@ func TestThresholdRetriesAreThrottledAfterFailure(t *testing.T) {
 			t.Fatalf("onLine returned %v, want nil", err)
 		}
 	}
-	if got := strings.Count(logs.String(), "error during"); got != 1 {
+	if got := countMsg(logRecords(t, logs), "aggregator.flush_failed"); got != 1 {
 		t.Errorf("flush attempts = %d, want 1 (only a tick may retry)", got)
 	}
 	if got := bufferedSize(a); got != n {
@@ -1041,10 +1109,10 @@ func TestFailedFlushCap(t *testing.T) {
 		name        string
 		lines       int
 		wantSize    int
-		wantDropLog string
+		wantDropped int // entries reported by aggregator.buffer_dropped; 0 means no record
 	}{
-		{"at cap is kept", 5, 5, ""},
-		{"over cap is dropped", 6, 0, "dropped 6 entries"},
+		{"at cap is kept", 5, 5, 0},
+		{"over cap is dropped", 6, 0, 6},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1062,13 +1130,7 @@ func TestFailedFlushCap(t *testing.T) {
 			if got := bufferedSize(a); got != tt.wantSize {
 				t.Errorf("bufferSize = %d, want %d", got, tt.wantSize)
 			}
-			if tt.wantDropLog == "" {
-				if strings.Contains(logs.String(), "dropped") {
-					t.Errorf("unexpected drop log: %s", logs.String())
-				}
-			} else if !strings.Contains(logs.String(), tt.wantDropLog) {
-				t.Errorf("log %q does not contain %q", logs.String(), tt.wantDropLog)
-			}
+			assertDropped(t, logs, tt.wantDropped)
 		})
 	}
 }
@@ -1093,9 +1155,7 @@ func TestRestoreCapCountsLiveBuffer(t *testing.T) {
 	if got := bufferedSize(a); got != 3 {
 		t.Errorf("bufferSize = %d, want 3 (3+3 exceeds the cap, snapshot dropped)", got)
 	}
-	if !strings.Contains(logs.String(), "dropped 3 entries") {
-		t.Errorf("log %q does not report the drop", logs.String())
-	}
+	assertDropped(t, logs, 3)
 }
 
 func TestRestoreMergesIntoLiveBuffer(t *testing.T) {

@@ -62,6 +62,7 @@ All configuration is via environment variables:
 | `TRAIL_LISTEN` | `:8080` | HTTP listen address |
 | `TRAIL_RETENTION_DAYS` | `90` | Auto-delete data older than N days |
 | `TRAIL_LOG_FORMAT` | `auto` | Log format: `auto`, `traefik`, `traefik-json`, or `combined` |
+| `TRAIL_LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error`. Trail's own logs are JSON on stdout. Unknown values fall back to `info`. Unrelated to `TRAIL_LOG_FORMAT`, which only selects how the input access log is parsed |
 | `TRAIL_HTPASSWD_FILE` | | Path to htpasswd file (bcrypt only) |
 | `TRAIL_AUTH_USER` | | Basic auth username |
 | `TRAIL_AUTH_PASS` | | Basic auth password |

@@ -228,3 +228,28 @@ func TestGetEnvOrDefault(t *testing.T) {
 		})
 	}
 }
+
+func TestLoadLogLevel(t *testing.T) {
+	tests := []struct {
+		name string
+		env  string
+		want string
+	}{
+		{"default", "", "info"},
+		{"debug", "debug", "debug"},
+		{"passed through unvalidated", "garbage", "garbage"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("TRAIL_LOG_LEVEL", tt.env)
+			t.Setenv("TRAIL_RETENTION_DAYS", "90")
+			got, err := Load()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.LogLevel != tt.want {
+				t.Errorf("LogLevel = %q, want %q", got.LogLevel, tt.want)
+			}
+		})
+	}
+}

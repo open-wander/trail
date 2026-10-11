@@ -6,7 +6,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
-	"log"
+	"log/slog"
 	"net/netip"
 	"net/url"
 	"sync"
@@ -130,7 +130,7 @@ func New(db *sql.DB, p *parser.Parser, geoDBPath string) *Aggregator {
 	// Generate random salt for IP hashing
 	saltBytes := make([]byte, 16)
 	if _, err := rand.Read(saltBytes); err != nil {
-		log.Printf("warning: failed to generate salt, using empty: %v", err)
+		slog.Warn("aggregator.salt_failed", "error", err)
 	}
 	salt := hex.EncodeToString(saltBytes)
 
@@ -139,9 +139,9 @@ func New(db *sql.DB, p *parser.Parser, geoDBPath string) *Aggregator {
 		var err error
 		geoReader, err = geoip2.Open(geoDBPath)
 		if err != nil {
-			log.Printf("warning: failed to open GeoIP database at %s: %v (country lookup disabled)", geoDBPath, err)
+			slog.Warn("geoip.unavailable", "path", geoDBPath, "error", err)
 		} else {
-			log.Printf("GeoIP database loaded: %s", geoDBPath)
+			slog.Info("geoip.loaded", "path", geoDBPath)
 		}
 	}
 
@@ -195,7 +195,7 @@ func (a *Aggregator) Run(ctx context.Context, lines <-chan string) error {
 				}
 			}
 			if err := a.flushOnShutdown(); err != nil {
-				log.Printf("error flushing on shutdown: %v", err)
+				slog.Error("aggregator.flush_failed", "trigger", "shutdown", "error", err)
 				return err
 			}
 			return nil
@@ -209,7 +209,7 @@ func (a *Aggregator) Run(ctx context.Context, lines <-chan string) error {
 			if !ok {
 				// Channel closed, flush and return
 				if err := a.flushOnShutdown(); err != nil {
-					log.Printf("error flushing on channel close: %v", err)
+					slog.Error("aggregator.flush_failed", "trigger", "channel_close", "error", err)
 					return err
 				}
 				return nil
@@ -230,7 +230,7 @@ func (a *Aggregator) onTick(ctx context.Context) error {
 	}
 	if err := a.flush(ctx); err != nil {
 		// The batch is kept; the next tick retries.
-		log.Printf("error during periodic flush: %v", err)
+		slog.Error("aggregator.flush_failed", "trigger", "tick", "error", err)
 	}
 	return nil
 }
@@ -250,7 +250,7 @@ func (a *Aggregator) onLine(ctx context.Context, line string) error {
 	// (and logged) once per incoming line.
 	if size >= bufferSizeThreshold && ctx.Err() == nil && !a.flushFailed {
 		if err := a.flush(ctx); err != nil {
-			log.Printf("error during buffer threshold flush: %v", err)
+			slog.Error("aggregator.flush_failed", "trigger", "threshold", "error", err)
 		}
 	}
 	return nil
@@ -260,7 +260,7 @@ func (a *Aggregator) onLine(ctx context.Context, line string) error {
 func (a *Aggregator) handleLine(line string) {
 	entry, err := a.parser.ParseLine(line)
 	if err != nil {
-		log.Printf("warning: skipping unparseable line: %v", err)
+		slog.Debug("aggregator.line_skipped", "error", err)
 		return
 	}
 	a.accumulate(entry)
@@ -428,7 +428,7 @@ func (a *Aggregator) restore(s *snapshot) {
 	defer a.mu.Unlock()
 
 	if a.bufferSize+s.size > a.maxBuffered {
-		log.Printf("error: buffer cap of %d entries exceeded after failed flush, dropped %d entries", a.maxBuffered, s.size)
+		slog.Error("aggregator.buffer_dropped", "cap", a.maxBuffered, "dropped", s.size)
 		return
 	}
 
@@ -659,7 +659,7 @@ func (a *Aggregator) writeSnapshot(ctx context.Context, s *snapshot) error {
 		return err
 	}
 
-	log.Printf("flushed %d entries to database", bufSize)
+	slog.Debug("aggregator.flushed", "entries", bufSize)
 	return nil
 }
 
