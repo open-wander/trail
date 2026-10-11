@@ -337,7 +337,7 @@ func TestTailer_CopytruncateDetection(t *testing.T) {
 	tailer := New(logPath, database)
 	lines := make(chan string, 10)
 
-	err = tailer.processTick(lines, offset, inode, size)
+	err = tailer.processTick(context.Background(), lines, offset, inode, size)
 	if err != nil {
 		t.Fatalf("processTick failed: %v", err)
 	}
@@ -361,6 +361,69 @@ collectLoop:
 	}
 	if len(collected) >= 1 && collected[0] != "new line 1" {
 		t.Errorf("expected 'new line 1', got '%s'", collected[0])
+	}
+}
+
+func TestProcessTick_CancelDoesNotAdvancePastUnsentLines(t *testing.T) {
+	database := setupTestDB(t)
+	defer database.Close()
+
+	logPath := filepath.Join(t.TempDir(), "test.log")
+	content := "aaa\n\nbbb\nccc\nddd\neee\n"
+	if err := os.WriteFile(logPath, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	tl := New(logPath, database)
+	blocked := make(chan string, 2) // nobody reads
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- tl.processTick(ctx, blocked, 0, 0, 0) }()
+
+	deadline := time.Now().Add(5 * time.Second)
+	for len(blocked) < 2 {
+		if time.Now().After(deadline) {
+			t.Fatal("channel never filled")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	cancel()
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Error("expected ctx error from processTick")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("processTick did not return after cancel")
+	}
+
+	// "aaa\n" + "\n" + "bbb\n" = 9 bytes
+	offset, inode, size, err := loadPosition(database, logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if offset != 9 {
+		t.Fatalf("saved offset = %d, want 9", offset)
+	}
+
+	// Resume: the unsent lines must be re-read.
+	out := make(chan string, 10)
+	if err := tl.processTick(context.Background(), out, offset, inode, size); err != nil {
+		t.Fatalf("second processTick: %v", err)
+	}
+	close(out)
+	var got []string
+	for l := range out {
+		got = append(got, l)
+	}
+	want := []string{"ccc", "ddd", "eee"}
+	if len(got) != len(want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("line %d = %q, want %q", i, got[i], want[i])
+		}
 	}
 }
 

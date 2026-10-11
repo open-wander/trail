@@ -99,8 +99,14 @@ func main() {
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
 	// Start goroutines for background services
+	// The tailer gets its own context so it can be stopped before the
+	// aggregator: once no sender exists, the aggregator's drain is complete.
+	tailCtx, tailCancel := context.WithCancel(ctx)
+	defer tailCancel()
+	tailDone := make(chan struct{})
 	go func() {
-		if err := tail.Run(ctx, lines); err != nil {
+		defer close(tailDone)
+		if err := tail.Run(tailCtx, lines); err != nil {
 			if err != context.Canceled {
 				log.Printf("Tailer error: %v", err)
 			}
@@ -142,7 +148,16 @@ func main() {
 		log.Fatalf("Server failed to start: %v", err)
 	}
 
-	// Cancel context to stop all goroutines
+	// Stop the tailer first so its final position save happens before the
+	// aggregator drains the channel and before the database is closed.
+	tailCancel()
+	select {
+	case <-tailDone:
+	case <-time.After(3 * time.Second):
+		log.Println("Tailer did not stop in time")
+	}
+
+	// Stop the aggregator and retention cleaner
 	cancel()
 
 	// Shutdown server with timeout

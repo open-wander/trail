@@ -597,6 +597,32 @@ func TestUserAgentUpsert(t *testing.T) {
 	}
 }
 
+func TestRunDrainsQueuedLinesOnCancel(t *testing.T) {
+	const n = 1500 // above bufferSizeThreshold to cover the threshold path
+	database := testDB(t)
+	agg := New(database, nil, "")
+
+	lines := make(chan string, n)
+	for range n {
+		lines <- `91.34.143.167 - - [07/Jan/2026:16:17:08 +0000] "GET / HTTP/1.1" 200 5 "-" "curl/8.7.1" 1 "web@docker" "http://172.19.0.4:80" 1ms`
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	if err := agg.Run(ctx, lines); err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+
+	var total int
+	if err := database.QueryRow(`SELECT COALESCE(SUM(count), 0) FROM requests`).Scan(&total); err != nil {
+		t.Fatalf("query failed: %v", err)
+	}
+	if total != n {
+		t.Errorf("expected %d requests in DB after shutdown, got %d", n, total)
+	}
+}
+
 func TestNewNilParserAcceptsTraefikJSON(t *testing.T) {
 	agg := New(testDB(t), nil, "")
 	lines := []string{

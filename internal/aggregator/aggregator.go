@@ -162,7 +162,22 @@ func (a *Aggregator) Run(ctx context.Context, lines <-chan string) error {
 	for {
 		select {
 		case <-ctx.Done():
-			// Flush remaining buffer before returning
+			// Process lines already queued, without blocking, then do one
+			// final flush. flush(ctx) is never used here: it resets the
+			// buffers before BeginTx, so a failure on a cancelled ctx would
+			// drop the entries.
+		drain:
+			for {
+				select {
+				case line, ok := <-lines:
+					if !ok {
+						break drain
+					}
+					a.handleLine(line)
+				default:
+					break drain
+				}
+			}
 			if err := a.flushOnShutdown(); err != nil {
 				log.Printf("error flushing on shutdown: %v", err)
 				return err
@@ -170,6 +185,9 @@ func (a *Aggregator) Run(ctx context.Context, lines <-chan string) error {
 			return nil
 
 		case <-ticker.C:
+			if ctx.Err() != nil {
+				continue // shutdown path flushes
+			}
 			if err := a.flush(ctx); err != nil {
 				log.Printf("error during periodic flush: %v", err)
 				return err
@@ -185,22 +203,15 @@ func (a *Aggregator) Run(ctx context.Context, lines <-chan string) error {
 				return nil
 			}
 
-			// Parse the line
-			entry, err := a.parser.ParseLine(line)
-			if err != nil {
-				log.Printf("warning: skipping unparseable line: %v", err)
-				continue
-			}
+			a.handleLine(line)
 
-			// Accumulate in memory
-			a.accumulate(entry)
-
-			// Check if buffer size threshold is reached
+			// Check if buffer size threshold is reached. After cancellation
+			// leave it to the shutdown path (see ctx.Done above).
 			a.mu.Lock()
 			size := a.bufferSize
 			a.mu.Unlock()
 
-			if size >= bufferSizeThreshold {
+			if size >= bufferSizeThreshold && ctx.Err() == nil {
 				if err := a.flush(ctx); err != nil {
 					log.Printf("error during buffer threshold flush: %v", err)
 					return err
@@ -208,6 +219,16 @@ func (a *Aggregator) Run(ctx context.Context, lines <-chan string) error {
 			}
 		}
 	}
+}
+
+// handleLine parses a raw log line and accumulates it; unparseable lines are skipped.
+func (a *Aggregator) handleLine(line string) {
+	entry, err := a.parser.ParseLine(line)
+	if err != nil {
+		log.Printf("warning: skipping unparseable line: %v", err)
+		return
+	}
+	a.accumulate(entry)
 }
 
 // accumulate adds a log entry to the in-memory buffers

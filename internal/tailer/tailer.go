@@ -52,7 +52,11 @@ func (t *Tailer) Run(ctx context.Context, lines chan<- string) error {
 			log.Printf("tailer: stopping (context cancelled)")
 			return ctx.Err()
 		case <-ticker.C:
-			if err := t.processTick(lines, savedOffset, savedInode, savedSize); err != nil {
+			if err := t.processTick(ctx, lines, savedOffset, savedInode, savedSize); err != nil {
+				if ctx.Err() != nil {
+					log.Printf("tailer: stopping (context cancelled)")
+					return ctx.Err()
+				}
 				// Non-fatal errors (file not found, etc.) - just log and retry
 				log.Printf("tailer: tick error: %v", err)
 				continue
@@ -65,7 +69,7 @@ func (t *Tailer) Run(ctx context.Context, lines chan<- string) error {
 }
 
 // processTick handles a single poll iteration.
-func (t *Tailer) processTick(lines chan<- string, savedOffset, savedInode, savedSize int64) error {
+func (t *Tailer) processTick(ctx context.Context, lines chan<- string, savedOffset, savedInode, savedSize int64) error {
 	// Stat the file to get current inode and size
 	stat, err := os.Stat(t.path)
 	if err != nil {
@@ -123,40 +127,46 @@ func (t *Tailer) processTick(lines chan<- string, savedOffset, savedInode, saved
 	// Read lines using buffered scanner
 	scanner := bufio.NewScanner(f)
 	lineCount := 0
-	newOffset := startOffset
+	readOffset := startOffset // advances for every scanned line, including empty ones
+	sentOffset := startOffset // offset after the last line handed to the channel
+	var ctxErr error
 
+scan:
 	for scanner.Scan() {
 		line := scanner.Text()
+		// scanner.Bytes() doesn't include the newline, add 1
+		readOffset += int64(len(scanner.Bytes())) + 1
 		if line == "" {
-			continue // Skip empty lines
+			sentOffset = readOffset // empty lines carry no data
+			continue
 		}
 
-		// Send line to processing channel
+		// Block until the line is handed over or we are cancelled; never skip.
 		select {
 		case lines <- line:
 			lineCount++
-		case <-time.After(5 * time.Second):
-			// Channel is blocked - log warning but don't fail
-			log.Printf("tailer: warning - channel blocked, skipping line")
+			sentOffset = readOffset
+		case <-ctx.Done():
+			ctxErr = ctx.Err()
+			break scan
 		}
-
-		// Update offset (scanner.Bytes() doesn't include newline, add 1)
-		newOffset += int64(len(scanner.Bytes())) + 1
 	}
 
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("scanner error: %w", err)
+	if ctxErr == nil {
+		if err := scanner.Err(); err != nil {
+			return fmt.Errorf("scanner error: %w", err)
+		}
 	}
 
-	// Save new position to database
-	if lineCount > 0 {
-		log.Printf("tailer: processed %d lines, new offset=%d", lineCount, newOffset)
-		if err := savePosition(t.db, t.path, newOffset, currentInode, currentSize); err != nil {
+	// Save the offset of the last line actually sent
+	if sentOffset > startOffset {
+		log.Printf("tailer: processed %d lines, new offset=%d", lineCount, sentOffset)
+		if err := savePosition(t.db, t.path, sentOffset, currentInode, currentSize); err != nil {
 			return fmt.Errorf("failed to save position: %w", err)
 		}
 	}
 
-	return nil
+	return ctxErr
 }
 
 // loadPosition retrieves the saved file position from the database.
