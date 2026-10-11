@@ -150,3 +150,7 @@ Comments: no task/phase identifiers, norman scaffolding or directive comments in
 ## 2026-10-11 - Phase 4 collapsed
 
 All five Phase 4 tasks DONE; table moved to TASKS-archive.md. Every phase in TASKS.md is complete. v0.5.0 (tagged at ce224b1) contains 4.1; 4.2-4.5 are on main after it.
+
+## 2026-10-11 - v0.5.1 released
+
+Tag v0.5.1 at 8743b7d (run 38157692471: tests green on Linux amd64/arm64, image `ghcr.io/open-wander/trail:0.5.1` built on the self-hosted runner, GitHub release created). New since v0.5.0: 4.4 (log-output tests, `startupAttrs`) and 4.5 (shutdown pipeline). Correction: v0.5.0 (ce224b1) already contained 4.1-4.3; the v0.5.1 tag annotation wrongly lists the 4.2/4.3 tests as new.
